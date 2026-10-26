@@ -245,7 +245,8 @@ typedef struct
     uint32_t beg;       // the start coordinate of the CDS (on the reference strand, 0-based)
     uint32_t pos;       // 0-based index of the first CDS-segment base within the transcript
     uint32_t len;       // CDS segment length
-    uint32_t icds:30,   // CDS index within the transcript
+    uint32_t icds:29,   // CDS index within the transcript
+             constitutive:1, // the constitutive=1 attribute of the CDS line, e.g. in Ensembl GFFs
              phase:2;   // offset of the CDS: 0,1,2 or 3 for unknown
 }
 gf_cds_t;
@@ -255,6 +256,7 @@ typedef struct
     uint32_t iseq;
     uint32_t id,beg,end,strand:31,  // used only by --dump-gff
              used:1;                // does it have any exons, CDS, UTR?
+    uint32_t type;                  // one of GF_* types from the gene biotype, 0 if absent or unknown
 }
 gf_gene_t;
 struct gf_exon_t_
@@ -293,12 +295,14 @@ typedef enum
     force_out_of_phase, // int, 1 to proceed even if CDS exon is out of expected phase
     dump_fname,         // const char*, dump the parsed GFF into this file, for debugging purposes
     link_exons,         // int, 1 to make cds_t.exon and tscript_t.nexons available [1]
+    strip_chr_names,    // int, 1 to strip the 'chr' prefix from the sequence names, 0 to leave as is [0]
 
     // read options
     idx_cds,
     idx_utr,
     idx_exon,
     idx_tscript,
+    idx_gene,           // regidx with gf_gene_t* payload, genes with and without transcripts
 }
 gff_opt_t;
 

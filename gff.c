@@ -55,8 +55,9 @@ typedef struct
     uint32_t end;
     uint32_t trid;
     uint32_t strand:2;  // STRAND_{REV,FWD,UNK}
+    uint32_t constitutive:1;
     uint32_t phase:2;   // 0, 1, 2, or 3 for unknown
-    uint32_t iseq:28;
+    uint32_t iseq:27;
 }
 ftr_t;
 
@@ -104,7 +105,7 @@ struct gff_t_
 
     // the main regidx lookups, from chr:beg-end to overlapping features and
     // index iterator
-    regidx_t *idx_cds, *idx_utr, *idx_exon, *idx_tscript;
+    regidx_t *idx_cds, *idx_utr, *idx_exon, *idx_tscript, *idx_gene;
 
     // str2int hash with parsed sequence names
     void *seq2int;
@@ -122,6 +123,7 @@ struct gff_t_
     int verbosity;
     int force;      // force run under various conditions. Currently only to skip out-of-phase transcripts
     int link_exons; // if not set, do not link CDS and exons
+    int strip_chr_names;    // strip the 'chr' prefix from the sequence names
 
     struct {
         int unknown_chr,unknown_tscript_biotype,unknown_strand,unknown_phase,duplicate_id;
@@ -173,6 +175,12 @@ int gff_set(gff_t *gff, gff_opt_t key, ...)
             va_end(args);
             return 0;
 
+        case strip_chr_names:
+            va_start(args, key);
+            gff->strip_chr_names = va_arg(args,int);
+            va_end(args);
+            return 0;
+
         default:
             error("The key %d is not supported with gff_set\n",key);
     }
@@ -187,6 +195,7 @@ void *gff_get(gff_t *gff, gff_opt_t key)
         case idx_utr: return gff->idx_utr;
         case idx_exon: return gff->idx_exon;
         case idx_tscript: return gff->idx_tscript;
+        case idx_gene: return gff->idx_gene;
         default:
             error("The key %d is not supported with gff_get\n",key);
     }
@@ -225,7 +234,7 @@ static inline int feature_set_seq(gff_t *gff, char *chr_beg, char *chr_end)
         gff->seq[gff->nseq] = new_chr;
         iseq = khash_str2int_inc(gff->seq2int, gff->seq[gff->nseq]);
         gff->nseq++;
-        assert( gff->nseq < 1<<29 );  // see gf_gene_t.iseq and ftr_t.iseq
+        assert( gff->nseq < 1<<27 );  // see ftr_t.iseq
     }
     chr_end[1] = tmp;
     return iseq;
@@ -241,6 +250,7 @@ static inline void gff_parse_chr(gff_t *gff, const char *line, char **chr_beg, c
     char *se = (char*) line;
     while ( *se && *se!='\t' ) se++;
     if ( !*se ) error("[%s:%d %s] Could not parse the line: %s\n",__FILE__,__LINE__,__FUNCTION__,line);
+    if ( gff->strip_chr_names && !strncasecmp("chr",line,3) ) line += 3;
     *chr_beg = (char*) line;
     *chr_end = se-1;
 }
@@ -494,6 +504,7 @@ static void gff_parse_gene(gff_t *gff, const char *line, ftr_t *ftr)
 {
     aux_t *aux = &gff->init;
     if ( !aux->id ) return;
+    ftr->type = gff_parse_biotype(aux->biotype);
 
     uint32_t gene_id;
     gff_id_register(&aux->gene_ids, aux->id, aux->id_end, &gene_id);
@@ -508,6 +519,7 @@ static void gff_parse_gene(gff_t *gff, const char *line, ftr_t *ftr)
     }
 
     gene->iseq   = feature_set_seq(gff, aux->chr,aux->chr_end);
+    gene->type   = ftr->type > 0 ? ftr->type : 0;
     gene->beg    = ftr->beg;
     gene->end    = ftr->end;
     gene->strand = ftr->strand;
@@ -521,6 +533,8 @@ static void gff_parse_gene(gff_t *gff, const char *line, ftr_t *ftr)
     }
     else
         gene->name = strdup(aux->gene_ids.str[gene_id]); // Name=<GeneName> field is not present, use the gene ID instead
+
+    regidx_push(gff->idx_gene, aux->chr, aux->chr_end, gene->beg,gene->end, &gene);
 }
 
 // Returns 0 for exons,CDS,UTRs to indicate these need to be pruned later and regidx built on them,
@@ -583,6 +597,7 @@ static int gff_parse_line(gff_t *gff, char *line, ftr_t *ftr)
 
     // 9th column: id, parent, name, biotype
     aux->name = NULL, aux->id = NULL, aux->parent = NULL, aux->biotype = NULL;
+    ftr->constitutive = 0;
     while ( *ss )
     {
         char *es = ss;
@@ -606,6 +621,7 @@ static int gff_parse_line(gff_t *gff, char *line, ftr_t *ftr)
         }
         else if ( !strncmp(ss,"biotype=",8) ) { aux->biotype = ss + 8; aux->biotype_end = es - 1; }
         else if ( !strncmp(ss,"gene_biotype=",13) ) { aux->biotype = ss + 13; aux->biotype_end = es - 1; }
+        else if ( !strncmp(ss,"constitutive=",13) ) { ftr->constitutive = ss[13]=='1' ? 1 : 0; }
         if ( !*es ) break;
         ss = es + 1;
     }
@@ -662,6 +678,7 @@ static void register_cds(gff_t *gff, ftr_t *ftr)
     cds->len   = ftr->end - ftr->beg + 1;
     cds->icds  = 0;     // to keep valgrind on mac happy
     cds->phase = ftr->phase;
+    cds->constitutive = ftr->constitutive;
 
     hts_expand(gf_cds_t*,tr->ncds+1,tr->mcds,tr->cds);
     tr->cds[tr->ncds++] = cds;
@@ -1048,6 +1065,7 @@ int gff_parse(gff_t *gff)
     aux->gid2gene  = kh_init(int2gene);      // gene id to gf_gene_t, for idx_gene
     aux->id2tr     = kh_init(int2tscript);   // transcript id to tscript_t
     gff->idx_tscript = regidx_init(NULL, NULL, regidx_free_tscript, sizeof(gf_tscript_t*), NULL);
+    gff->idx_gene = regidx_init(NULL, NULL, NULL, sizeof(gf_gene_t*), NULL);    // the genes are freed via gid2gene
     aux->ignored_biotypes = khash_str2int_init();
     gff_id_init(&aux->gene_ids);
     gff_id_init(&gff->tscript_ids);
@@ -1187,6 +1205,7 @@ void gff_destroy(gff_t *gff)
     regidx_destroy(gff->idx_utr);
     regidx_destroy(gff->idx_exon);
     regidx_destroy(gff->idx_tscript);
+    regidx_destroy(gff->idx_gene);
 
     khash_str2int_destroy_free(gff->seq2int);
     gff_id_destroy(&gff->tscript_ids);
