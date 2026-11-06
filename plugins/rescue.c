@@ -7,7 +7,7 @@
     or that induces an exon skip or an intron retention, is tagged, together with
     whether the transcript is predicted to be degraded by nonsense-mediated decay.
 
-    The predictions are made by librescueranger, which is not part of bcftools:
+    The predictions are made by librescue, which is not part of bcftools:
     this plugin is only compiled when the library is installed, see INSTALL.
     This file takes care of the command line and the files. */
 
@@ -18,7 +18,7 @@
 #include <string.h>
 #include <htslib/hts.h>
 #include <htslib/vcf.h>
-#include <rescueranger/rescueranger.h>
+#include <rescue/rescue.h>
 #include "bcftools.h"
 
 typedef struct
@@ -27,7 +27,7 @@ typedef struct
     char *output_fname, *scores_fname;
     int output_type, clevel;
     int record_cmd_line;
-    RescueRangerOptions opts;
+    RescueOptions opts;
     int argc;
     char **argv;
 }
@@ -77,7 +77,7 @@ static int annotate(args_t *args)
     htsFile *fp_in = NULL, *fp_out = NULL;
     bcf_hdr_t *hdr = NULL;
     FILE *scores_tsv = NULL;
-    RescueRanger *rr = NULL;
+    Rescue *rr = NULL;
 
     if ( !(fp_in = hts_open(args->fname, "r")) )
     {

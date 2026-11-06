@@ -169,7 +169,7 @@ Optional Compilation of the rescue Plugin
 =========================================
 
 The 'rescue' plugin predicts the rescue of protein-truncating variants from
-splice changes. It needs the RescueRanger library, which depends on HTSlib,
+splice changes. It needs the rescue library, which depends on HTSlib,
 CpliceAI and ONNX Runtime. See <https://github.com/jhampstead/RescueRanger>
 for how to install them. The plugin is compiled only when the library is
 installed; otherwise it is skipped with a notice and the rest of bcftools is
@@ -178,7 +178,7 @@ built as usual.
 The library is found with pkg-config. For a library installed elsewhere, give
 its prefix:
 
-    make RESCUERANGER_ROOT=/path/to/rescueranger
+    make RESCUE_ROOT=/path/to/rescue
 
 Installation
 ============
