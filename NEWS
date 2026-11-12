@@ -68,12 +68,13 @@ Changes affecting specific commands:
       LOFTEE plugin of VEP, adding INFO/LOF (HC or LC), INFO/LOF_FILTERS and
       INFO/LOF_FLAGS for each INFO/BCSQ consequence. The filters and flags are
       in lower case, like the consequences of `csq`. end_trunc follows the
-      LOFTEE-2 cutoffs instead of GERP, stop_end_trunc filters frameshifts whose
-      new stop codon escapes NMD, there are no splice predictions, and the
+      LOFTEE-2 cutoffs instead of GERP and is measured to the last exon of the
+      transcript, coding or not, stop_end_trunc filters frameshifts whose new
+      stop codon escapes NMD, there are no splice predictions, and the
       transcripts are read from the Ensembl or GENCODE GFF3 used by `csq`.
       Local and haplotype-aware `csq` output are both supported. INFO/LOF_REGION
-      gives the NMD region of the premature stop codon, adapted from Blakes et
-      al. (2026) with the distal region starting at the last coding exon
+      gives the NMD region of the premature stop codon as defined by Blakes et
+      al. (2026)
 
 * bcftools +mendelian
 

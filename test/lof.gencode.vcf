@@ -1,9 +1,9 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
-##contig=<ID=chr1,length=18894>
+##contig=<ID=chr1,length=33902>
 ##INFO=<ID=TEST,Number=1,Type=String,Description="Test case">
-##bcftools/csqVersion=b4a639d9-dirty+htslib-1.25-20-gae5f79dd
-##bcftools/csqCommand=csq -l -f lof.fa -g lof.gencode.gff lof.raw.vcf; Date=Thu Nov 12 10:14:48 2026
+##bcftools/csqVersion=8b861d05+htslib-1.25-20-gae5f79dd
+##bcftools/csqCommand=csq -l -f lof.fa -g lof.gencode.gff lof.raw.vcf; Date=Thu Nov 12 19:57:03 2026
 ##INFO=<ID=BCSQ,Number=.,Type=String,Description="Local consequence annotation from BCFtools/csq, see http://samtools.github.io/bcftools/howtos/csq-calling.html for details. Format: Consequence|gene|transcript|biotype|strand|amino_acid_change|dna_change">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
 chr1	761	.	G	A	.	.	TEST=A_5utr_donor;BCSQ=splice_donor|GENEA|ENST00000000101.1|protein_coding,splice_donor|GENEA|ENST00000000102.1|protein_coding
@@ -15,12 +15,12 @@ chr1	1480	.	CA	C	.	.	TEST=A_frameshift;BCSQ=stop_gained&frameshift|GENEA|ENST000
 chr1	1501	.	C	A	.	.	TEST=A_phylocsf_weak;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|67Y>67*|1501C>A
 chr1	1531	.	C	A	.	.	TEST=A_ancestral;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|77Y>77*|1531C>A
 chr1	1572	.	C	T	.	.	TEST=A_gc_donor;BCSQ=splice_donor|GENEA|ENST00000000101.1|protein_coding
-chr1	1907	.	C	A	.	.	TEST=A_end_51;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|119Y>119*|1907C>A,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|69Y>69*|1907C>A
-chr1	1908	.	C	T	.	.	TEST=A_end_trunc_50;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|120Q>120*|1908C>T,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|70Q>70*|1908C>T
+chr1	1907	.	C	A	.	.	TEST=A_last_coding_51;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|119Y>119*|1907C>A,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|69Y>69*|1907C>A
+chr1	1908	.	C	T	.	.	TEST=A_last_coding_50;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|120Q>120*|1908C>T,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|70Q>70*|1908C>T
 chr1	1920	.	G	A	.	.	TEST=A_small_intron;BCSQ=splice_donor|GENEA|ENST00000000101.1|protein_coding,splice_donor|GENEA|ENST00000000102.1|protein_coding
 chr1	1948	.	C	T	.	.	TEST=A_before_last_coding;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|130Q>130*|1948C>T,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|80Q>80*|1948C>T
 chr1	1970	.	A	G	.	.	TEST=A_non_canonical;BCSQ=splice_donor|GENEA|ENST00000000101.1|protein_coding,splice_donor|GENEA|ENST00000000102.1|protein_coding
-chr1	2211	.	C	T	.	.	TEST=A_last_exon;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|151Q>151*|2211C>T,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|101Q>101*|2211C>T
+chr1	2211	.	C	T	.	.	TEST=A_last_coding_exon;BCSQ=stop_gained|GENEA|ENST00000000101.1|protein_coding|+|151Q>151*|2211C>T,stop_gained|GENEA|ENST00000000102.1|protein_coding|+|101Q>101*|2211C>T
 chr1	2511	.	G	A	.	.	TEST=A_3utr_acceptor;BCSQ=splice_acceptor|GENEA|ENST00000000101.1|protein_coding,splice_acceptor|GENEA|ENST00000000102.1|protein_coding
 chr1	3502	.	G	T	.	.	TEST=B_last_exon;BCSQ=stop_gained|GENEB|ENST00000000201.1|protein_coding|-|134S>134*|3502G>T
 chr1	3553	.	T	C	.	.	TEST=B_nagnag;BCSQ=splice_acceptor|GENEB|ENST00000000201.1|protein_coding
@@ -62,3 +62,23 @@ chr1	17364	.	C	T	.	.	TEST=L_region_500;BCSQ=stop_gained|GENEL|ENST00000000901.1|
 chr1	17365	.	C	T	.	.	TEST=L_region_499;BCSQ=stop_gained|GENEL|ENST00000000901.1|protein_coding|-|167W>167*|17365C>T
 chr1	18014	.	G	A	.	.	TEST=L_region_150;BCSQ=stop_gained|GENEL|ENST00000000901.1|protein_coding|-|51Q>51*|18014G>A
 chr1	18015	.	G	T	.	.	TEST=L_region_149;BCSQ=stop_gained|GENEL|ENST00000000901.1|protein_coding|-|50Y>50*|18015G>T
+chr1	19675	.	C	T	.	.	TEST=M_utr_exon_450;BCSQ=stop_gained|GENEM|ENST00000001001.1|protein_coding|+|151Q>151*|19675C>T
+chr1	20045	.	C	A	.	.	TEST=M_utr_exon_520;BCSQ=stop_gained|GENEM|ENST00000001001.1|protein_coding|+|174S>174*|20045C>A
+chr1	20144	.	G	A	.	.	TEST=M_utr_exon_619;BCSQ=stop_gained|GENEM|ENST00000001001.1|protein_coding|+|207W>207*|20144G>A
+chr1	20145	.	G	A	.	.	TEST=M_utr_exon_620;BCSQ=stop_gained|GENEM|ENST00000001001.1|protein_coding|+|207W>207*|20145G>A
+chr1	20146	.	C	T	.	.	TEST=M_utr_exon_621;BCSQ=stop_gained|GENEM|ENST00000001001.1|protein_coding|+|208Q>208*|20146C>T
+chr1	21745	.	G	A	.	.	TEST=N_utr_exon_621;BCSQ=stop_gained|GENEN|ENST00000001101.1|protein_coding|-|208Q>208*|21745G>A
+chr1	21746	.	C	T	.	.	TEST=N_utr_exon_620;BCSQ=stop_gained|GENEN|ENST00000001101.1|protein_coding|-|207W>207*|21746C>T
+chr1	21747	.	C	T	.	.	TEST=N_utr_exon_619;BCSQ=stop_gained|GENEN|ENST00000001101.1|protein_coding|-|207W>207*|21747C>T
+chr1	21846	.	G	T	.	.	TEST=N_utr_exon_520;BCSQ=stop_gained|GENEN|ENST00000001101.1|protein_coding|-|174S>174*|21846G>T
+chr1	22216	.	G	A	.	.	TEST=N_utr_exon_450;BCSQ=stop_gained|GENEN|ENST00000001101.1|protein_coding|-|151Q>151*|22216G>A
+chr1	24946	.	G	A	.	.	TEST=P_utr_exon_619;BCSQ=stop_gained|GENEP|ENST00000001201.1|protein_coding|+|207W>207*|24946G>A
+chr1	24947	.	G	A	.	.	TEST=P_utr_exon_620;BCSQ=stop_gained|GENEP|ENST00000001201.1|protein_coding|+|207W>207*|24947G>A
+chr1	24967	.	C	A	.	.	TEST=P_utr_exon_640;BCSQ=stop_gained|GENEP|ENST00000001201.1|protein_coding|+|214S>214*|24967C>A
+chr1	27130	.	G	T	.	.	TEST=Q_utr_exon_640;BCSQ=stop_gained|GENEQ|ENST00000001301.1|protein_coding|-|214S>214*|27130G>T
+chr1	27150	.	C	T	.	.	TEST=Q_utr_exon_620;BCSQ=stop_gained|GENEQ|ENST00000001301.1|protein_coding|-|207W>207*|27150C>T
+chr1	27151	.	C	T	.	.	TEST=Q_utr_exon_619;BCSQ=stop_gained|GENEQ|ENST00000001301.1|protein_coding|-|207W>207*|27151C>T
+chr1	29880	.	CG	C	.	.	TEST=R_fs_stop_111;BCSQ=stop_gained&frameshift|GENER|ENST00000001401.1|protein_coding|+|150AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVTAAAAAAAAAAAAAAAAAAAAAAAAAADA>150APPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP*|29880CG>C
+chr1	29883	.	C	CT	.	.	TEST=R_fs_stop_29;BCSQ=stop_gained&frameshift|GENER|ENST00000001401.1|protein_coding|+|151AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVTAAAAAAAAAAAAAAAAAAAAAAAAAADA>151ACRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRNRRRRRRRRRRRRRRRRRRRRRRRRRR*|29883C>CT
+chr1	32419	.	C	CA	.	.	TEST=S_fs_stop_29;BCSQ=stop_gained&frameshift|GENES|ENST00000001501.1|protein_coding|-|152AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVTAAAAAAAAAAAAAAAAAAAAAAAAAADA>152CRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRNRRRRRRRRRRRRRRRRRRRRRRRRRR*|32419C>CA
+chr1	32421	.	GC	G	.	.	TEST=S_fs_stop_111;BCSQ=stop_gained&frameshift|GENES|ENST00000001501.1|protein_coding|-|151AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVTAAAAAAAAAAAAAAAAAAAAAAAAAADA>151PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP*|32421GC>G

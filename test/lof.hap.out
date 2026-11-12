@@ -1,16 +1,16 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
-##contig=<ID=chr1,length=18894>
+##contig=<ID=chr1,length=33902>
 ##INFO=<ID=TEST,Number=1,Type=String,Description="Test case">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##bcftools/csqVersion=b4a639d9-dirty+htslib-1.25-20-gae5f79dd
-##bcftools/csqCommand=csq -f lof.fa -g lof.gff lof.hap.raw.vcf; Date=Thu Nov 12 10:14:48 2026
+##bcftools/csqVersion=8b861d05+htslib-1.25-20-gae5f79dd
+##bcftools/csqCommand=csq -f lof.fa -g lof.gff lof.hap.raw.vcf; Date=Thu Nov 12 19:57:03 2026
 ##INFO=<ID=BCSQ,Number=.,Type=String,Description="Haplotype-aware consequence annotation from BCFtools/csq, see http://samtools.github.io/bcftools/howtos/csq-calling.html for details. Format: Consequence|gene|transcript|biotype|strand|amino_acid_change|dna_change">
 ##FORMAT=<ID=BCSQ,Number=.,Type=Integer,Description="Bitmask of indexes to INFO/BCSQ, with interleaved first/second haplotype. Use \"bcftools query -f'[%CHROM\t%POS\t%SAMPLE\t%TBCSQ\n]'\" to translate.">
 ##INFO=<ID=LOF,Number=.,Type=String,Description="LOFTEE confidence of each BCSQ consequence: HC high, LC low (LOF_FILTERS set), '.' not a loss of function">
 ##INFO=<ID=LOF_FILTERS,Number=.,Type=String,Description="LOFTEE filters that make each BCSQ consequence LC, separated by '&', '.' if none">
 ##INFO=<ID=LOF_FLAGS,Number=.,Type=String,Description="LOFTEE flags of each BCSQ consequence, informative only, separated by '&', '.' if none">
-##INFO=<ID=LOF_REGION,Number=.,Type=String,Description="NMD region of the premature stop codon of each BCSQ consequence, adapted from Blakes et al. 2026 with distal starting at the last coding exon: start_proximal, distal, long_exon or nmd_target; non_coding for a splice site of a UTR intron, other for a splice site of a coding intron">
+##INFO=<ID=LOF_REGION,Number=.,Type=String,Description="NMD region of the premature stop codon of each BCSQ consequence (Blakes et al. 2026): start_proximal, distal, long_exon or nmd_target; non_coding for a splice site of a UTR intron, other for a splice site of a coding intron">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S1
 chr1	3903	.	G	T	.	.	TEST=B_end_51;BCSQ=*stop_gained|GENEB|ENST00000000201|protein_coding|-|100Y>100*|3903G>T;LOF=HC;LOF_FILTERS=.;LOF_FLAGS=.;LOF_REGION=nmd_target	GT:BCSQ	0|1:2
 chr1	4512	.	G	A	.	.	TEST=B_middle;BCSQ=stop_gained|GENEB|ENST00000000201|protein_coding|-|31Q>31*|4512G>A;LOF=HC;LOF_FILTERS=.;LOF_FLAGS=.;LOF_REGION=start_proximal	GT:BCSQ	0|1:2

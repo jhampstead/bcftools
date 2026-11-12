@@ -1,5 +1,5 @@
 ##fileformat=VCFv4.2
-##contig=<ID=chr1,length=18894>
+##contig=<ID=chr1,length=33902>
 ##INFO=<ID=TEST,Number=1,Type=String,Description="Test case">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
 chr1	761	.	G	A	.	.	TEST=A_5utr_donor
@@ -11,12 +11,12 @@ chr1	1480	.	CA	C	.	.	TEST=A_frameshift
 chr1	1501	.	C	A	.	.	TEST=A_phylocsf_weak
 chr1	1531	.	C	A	.	.	TEST=A_ancestral
 chr1	1572	.	C	T	.	.	TEST=A_gc_donor
-chr1	1907	.	C	A	.	.	TEST=A_end_51
-chr1	1908	.	C	T	.	.	TEST=A_end_trunc_50
+chr1	1907	.	C	A	.	.	TEST=A_last_coding_51
+chr1	1908	.	C	T	.	.	TEST=A_last_coding_50
 chr1	1920	.	G	A	.	.	TEST=A_small_intron
 chr1	1948	.	C	T	.	.	TEST=A_before_last_coding
 chr1	1970	.	A	G	.	.	TEST=A_non_canonical
-chr1	2211	.	C	T	.	.	TEST=A_last_exon
+chr1	2211	.	C	T	.	.	TEST=A_last_coding_exon
 chr1	2511	.	G	A	.	.	TEST=A_3utr_acceptor
 chr1	3502	.	G	T	.	.	TEST=B_last_exon
 chr1	3553	.	T	C	.	.	TEST=B_nagnag
@@ -58,3 +58,23 @@ chr1	17364	.	C	T	.	.	TEST=L_region_500
 chr1	17365	.	C	T	.	.	TEST=L_region_499
 chr1	18014	.	G	A	.	.	TEST=L_region_150
 chr1	18015	.	G	T	.	.	TEST=L_region_149
+chr1	19675	.	C	T	.	.	TEST=M_utr_exon_450
+chr1	20045	.	C	A	.	.	TEST=M_utr_exon_520
+chr1	20144	.	G	A	.	.	TEST=M_utr_exon_619
+chr1	20145	.	G	A	.	.	TEST=M_utr_exon_620
+chr1	20146	.	C	T	.	.	TEST=M_utr_exon_621
+chr1	21745	.	G	A	.	.	TEST=N_utr_exon_621
+chr1	21746	.	C	T	.	.	TEST=N_utr_exon_620
+chr1	21747	.	C	T	.	.	TEST=N_utr_exon_619
+chr1	21846	.	G	T	.	.	TEST=N_utr_exon_520
+chr1	22216	.	G	A	.	.	TEST=N_utr_exon_450
+chr1	24946	.	G	A	.	.	TEST=P_utr_exon_619
+chr1	24947	.	G	A	.	.	TEST=P_utr_exon_620
+chr1	24967	.	C	A	.	.	TEST=P_utr_exon_640
+chr1	27130	.	G	T	.	.	TEST=Q_utr_exon_640
+chr1	27150	.	C	T	.	.	TEST=Q_utr_exon_620
+chr1	27151	.	C	T	.	.	TEST=Q_utr_exon_619
+chr1	29880	.	CG	C	.	.	TEST=R_fs_stop_111
+chr1	29883	.	C	CT	.	.	TEST=R_fs_stop_29
+chr1	32419	.	C	CA	.	.	TEST=S_fs_stop_29
+chr1	32421	.	GC	G	.	.	TEST=S_fs_stop_111

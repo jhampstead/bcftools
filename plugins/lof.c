@@ -19,6 +19,9 @@
         - for a frameshift, start_trunc is measured from the new stop codon,
           located from the protein predicted by csq, and stop_end_trunc filters
           a frameshift whose new stop falls where end_trunc would apply
+        - the 50 bp rule of end_trunc is measured to the last exon of the
+          transcript, which can follow the last coding exon: an exon junction
+          in the 3' UTR makes a stop upstream of it a target of NMD
         - there are no splice predictions (MaxEntScan, de novo donors), so no
           OS consequences
         - the PhyloCSF, ancestral allele and incomplete CDS checks are always
@@ -27,9 +30,7 @@
 
     INFO/LOF_REGION adds the NMD region of the premature stop codon, as defined in
     Blakes et al., Regional nonsense constraint offers biological and clinical
-    insights into genetic disease, Nat Commun 17, 3152 (2026) and as reported
-    by the rescue plugin, except that the distal region starts at the last
-    coding exon rather than the last exon.
+    insights into genetic disease, Nat Commun 17, 3152 (2026).
 */
 
 #include <stdio.h>
@@ -50,7 +51,7 @@
 #include "gff.h"
 
 // The relaxed LOFTEE-2 cutoffs: a stop gain or a frameshift must be further than this many bases from
-#define MIN_DIST_LAST_EXON      50      // the start of the last coding exon (the 50 bp rule)
+#define MIN_DIST_LAST_EXON      50      // the start of the last exon (the 50 bp rule)
 #define MIN_DIST_CDS_START      50      // the start of the CDS
 #define MIN_DIST_CDS_START_1EX 250      // the start of the CDS, single-exon transcripts
 #define MIN_DIST_TSCRIPT_END   200      // the end of the transcript, single-exon transcripts
@@ -59,7 +60,7 @@
 
 // The NMD regions of Blakes et al., in the order they take precedence
 #define NMD_START_PROXIMAL  150     // start_proximal: at most this many bases from the start of the CDS
-#define NMD_PENULTIMATE      50     // distal: the last coding exon, and at most this upstream of the junction before it
+#define NMD_PENULTIMATE      50     // distal: the last exon, and at most this upstream of the junction before it
 #define NMD_LONG_EXON       400     // long_exon: more than this upstream of the next exon junction
 
 #define LOF_STOP_GAINED  1
@@ -83,7 +84,7 @@ typedef struct
     int nexon, tlen, ok;
     exon_t *exon;
     int cds_tbeg, cds_tend;     // the CDS as transcript offsets, including the stop codon
-    int cds_ibeg, cds_iend;     // the first and the last coding exon
+    int cds_ibeg;               // the first coding exon
     uint32_t cds_beg, cds_end;  // the CDS in genomic coordinates
     int incomplete;
 }
@@ -166,9 +167,8 @@ const char *usage(void)
         "About: Assess the loss-of-function consequences of bcftools csq like the LOFTEE plugin of VEP.\n"
         "       Adds INFO/LOF with HC or LC, INFO/LOF_FILTERS with the LOFTEE filters that make it LC,\n"
         "       INFO/LOF_FLAGS with the informative LOFTEE flags and INFO/LOF_REGION with the NMD region of\n"
-        "       the premature stop codon (adapted from Blakes et al. 2026: distal starts at the last coding\n"
-        "       exon), one value per INFO/BCSQ consequence and '.' for consequences that are not a loss of\n"
-        "       function or have no filters or flags.\n"
+        "       the premature stop codon (Blakes et al. 2026), one value per INFO/BCSQ consequence and '.'\n"
+        "       for consequences that are not a loss of function or have no filters or flags.\n"
         "       Works with local and haplotype-aware csq output; a compound consequence is assessed\n"
         "       where csq prints it, and the \"@POS\" references to it are '.'. Multiallelic records are\n"
         "       skipped, split them before running bcftools csq.\n"
@@ -333,7 +333,7 @@ static tscript_t *tscript_get(gf_tscript_t *tr)
     tx->incomplete = tr->trim || !has_start || !has_stop;
 
     beg = tscript_pos(tr, tx, tx->cds_tbeg, &tx->cds_ibeg);
-    end = tscript_pos(tr, tx, tx->cds_tend, &tx->cds_iend);
+    end = tscript_pos(tr, tx, tx->cds_tend, NULL);
     tx->cds_beg = fwd ? beg : end;
     tx->cds_end = fwd ? end : beg;
     tx->ok = 1;
@@ -545,14 +545,14 @@ static int exonic_offset(gf_tscript_t *tr, tscript_t *tx, uint32_t pos, int *iex
 }
 
 /*
-    The LOFTEE-2 distance from the start of the last coding exon, negative inside it. Like the
-    distance from the start of the CDS, it loses a base for each exon boundary crossed, as in LOFTEE,
-    from which LOFTEE-2 took them.
+    The LOFTEE-2 distance from the start of the last exon, negative inside it. The last exon of the
+    transcript, not the last coding one: an exon junction in the 3' UTR makes a stop upstream of it
+    a target of NMD. Like the distance from the start of the CDS, it loses a base for each exon
+    boundary crossed, as in LOFTEE, from which LOFTEE-2 took them.
 */
 static int dist_last_exon(tscript_t *tx, int toff, int iexon)
 {
-    int last = tx->cds_iend;
-    int last_beg = tx->exon[last].tbeg > tx->cds_tbeg ? tx->exon[last].tbeg : tx->cds_tbeg;
+    int last = tx->nexon - 1, last_beg = tx->exon[last].tbeg;
     if ( iexon >= last ) return last_beg - toff;
     return last_beg - 1 - toff - (last - 1 - iexon);
 }
@@ -628,7 +628,7 @@ static int locate_ptc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *b
 
 /*
     Truncations by the LOFTEE-2 distances from the start of the CDS and from the start of the last
-    coding exon. A variant starting in an intron is measured from the first base of the next exon.
+    exon. A variant starting in an intron is measured from the first base of the next exon.
 
     What matters for a frameshift is the stop codon it creates: whether it triggers NMD, and whether
     it is close enough to the start for translation to reinitiate downstream. end_trunc still refers
@@ -656,17 +656,16 @@ static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, pt
 /*
     The NMD region of Blakes et al. of a premature stop codon. Unlike the LOFTEE-2 distances, these
     are plain 1-based distances, as in their code: the first base of the CDS is 1 base from its start
-    and the last base of an exon 1 base upstream of its junction. As for end_trunc, distal starts at
-    the last coding exon: the exon junctions of a spliced 3' UTR are downstream of the normal stop
-    codon too, so they do not make a stop in that exon a target of NMD. A transcript of one exon is
-    distal past its first coding bases.
+    and the last base of an exon 1 base upstream of its junction. As for end_trunc, distal is the
+    last exon of the transcript, coding or not, and the last 50 bases of the exon before it. A
+    transcript of one exon is distal past its first coding bases.
 */
 static const char *nmd_region(tscript_t *tx, ptc_t *ptc)
 {
     exon_t *exon = &tx->exon[ptc->istop];
     int from_start  = ptc->stop - tx->cds_tbeg + 1;
     int to_junction = exon->tbeg + (exon->end - exon->beg) - ptc->stop + 1;
-    int last = tx->cds_iend;
+    int last = tx->nexon - 1;
 
     if ( from_start <= NMD_START_PROXIMAL ) return "start_proximal";
     if ( ptc->istop >= last ) return "distal";
@@ -891,8 +890,8 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
     bcf_hdr_printf(out, "##INFO=<ID=LOF_FLAGS,Number=.,Type=String,Description=\"LOFTEE flags of each %s consequence, informative "
         "only, separated by '&', '.' if none\">", args.csq_tag);
     bcf_hdr_printf(out, "##INFO=<ID=LOF_REGION,Number=.,Type=String,Description=\"NMD region of the premature stop codon of each %s "
-        "consequence, adapted from Blakes et al. 2026 with distal starting at the last coding exon: start_proximal, distal, "
-        "long_exon or nmd_target; non_coding for a splice site of a UTR intron, other for a splice site of a coding intron\">", args.csq_tag);
+        "consequence (Blakes et al. 2026): start_proximal, distal, long_exon or nmd_target; non_coding for a splice site "
+        "of a UTR intron, other for a splice site of a coding intron\">", args.csq_tag);
     return 0;
 }
 
