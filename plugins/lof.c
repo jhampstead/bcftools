@@ -8,15 +8,17 @@
     informative. They go to INFO/LOF, INFO/LOF_FILTERS and INFO/LOF_FLAGS.
 
     Where this differs from LOFTEE:
+        - the filters and flags are in lower case, like the consequences of
+          bcftools csq
         - the transcripts come from the GFF3 given to bcftools csq, Ensembl or
           GENCODE, rather than from the Ensembl API
-        - END_TRUNC follows LOFTEE-2 (the relaxed cutoffs of the gnomAD v4
+        - end_trunc follows LOFTEE-2 (the relaxed cutoffs of the gnomAD v4
           flagship paper) instead of the GERP-weighted distance to the stop
-          codon, and START_TRUNC filters a truncation too close to the start of
+          codon, and start_trunc filters a truncation too close to the start of
           the CDS, as LOFTEE-2 does
-        - for a frameshift, START_TRUNC is measured from the new stop codon,
-          located from the protein predicted by csq, and STOP_END_TRUNC filters
-          a frameshift whose new stop falls where END_TRUNC would apply
+        - for a frameshift, start_trunc is measured from the new stop codon,
+          located from the protein predicted by csq, and stop_end_trunc filters
+          a frameshift whose new stop falls where end_trunc would apply
         - there are no splice predictions (MaxEntScan, de novo donors), so no
           OS consequences
         - the PhyloCSF, ancestral allele and incomplete CDS checks are always
@@ -629,9 +631,9 @@ static int locate_ptc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *b
     coding exon. A variant starting in an intron is measured from the first base of the next exon.
 
     What matters for a frameshift is the stop codon it creates: whether it triggers NMD, and whether
-    it is close enough to the start for translation to reinitiate downstream. END_TRUNC still refers
-    to the frameshift itself and STOP_END_TRUNC to the stop. There is no NMD to escape in single-exon
-    transcripts, hence no STOP_END_TRUNC there.
+    it is close enough to the start for translation to reinitiate downstream. end_trunc still refers
+    to the frameshift itself and stop_end_trunc to the stop. There is no NMD to escape in single-exon
+    transcripts, hence no stop_end_trunc there.
 */
 static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc)
 {
@@ -641,20 +643,20 @@ static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, pt
     {
         uint32_t tend = tr->strand==STRAND_FWD ? tr->end : tr->beg;
         uint32_t to_end = var->pos > tend ? var->pos - tend : tend - var->pos;
-        if ( to_end <= MIN_DIST_TSCRIPT_END ) add_tag("END_TRUNC", FILTER);
-        if ( from_start <= MIN_DIST_CDS_START_1EX ) add_tag("START_TRUNC", FILTER);
+        if ( to_end <= MIN_DIST_TSCRIPT_END ) add_tag("end_trunc", FILTER);
+        if ( from_start <= MIN_DIST_CDS_START_1EX ) add_tag("start_trunc", FILTER);
         return;
     }
 
-    if ( dist_last_exon(tx, ptc->var, ptc->ivar) <= MIN_DIST_LAST_EXON ) add_tag("END_TRUNC", FILTER);
-    else if ( dist_last_exon(tx, ptc->stop, ptc->istop) <= MIN_DIST_LAST_EXON ) add_tag("STOP_END_TRUNC", FILTER);
-    if ( from_start <= MIN_DIST_CDS_START ) add_tag("START_TRUNC", FILTER);
+    if ( dist_last_exon(tx, ptc->var, ptc->ivar) <= MIN_DIST_LAST_EXON ) add_tag("end_trunc", FILTER);
+    else if ( dist_last_exon(tx, ptc->stop, ptc->istop) <= MIN_DIST_LAST_EXON ) add_tag("stop_end_trunc", FILTER);
+    if ( from_start <= MIN_DIST_CDS_START ) add_tag("start_trunc", FILTER);
 }
 
 /*
     The NMD region of Blakes et al. of a premature stop codon. Unlike the LOFTEE-2 distances, these
     are plain 1-based distances, as in their code: the first base of the CDS is 1 base from its start
-    and the last base of an exon 1 base upstream of its junction. As for END_TRUNC, distal starts at
+    and the last base of an exon 1 base upstream of its junction. As for end_trunc, distal starts at
     the last coding exon: the exon junctions of a spliced 3' UTR are downstream of the normal stop
     codon too, so they do not make a stop in that exon a target of NMD. A transcript of one exon is
     distal past its first coding bases.
@@ -683,7 +685,7 @@ static void check_phylocsf(gf_tscript_t *tr, int iexon)
     if ( khash_str2int_get(args.phylo_idx, args.tmp.s, &idx) < 0 ) return;
     phylocsf_t *phylo = &args.phylo[idx];
     if ( iexon >= phylo->nexon || isnan(phylo->orf[iexon]) || phylo->orf[iexon] >= 0 ) return;
-    add_tag(phylo->max[iexon] > 0 ? "PHYLOCSF_UNLIKELY_ORF" : "PHYLOCSF_WEAK", FLAG);
+    add_tag(phylo->max[iexon] > 0 ? "phylocsf_unlikely_orf" : "phylocsf_weak", FLAG);
 }
 
 // The 9 bases around an SNV in an acceptor contain another acceptor in frame
@@ -700,7 +702,7 @@ static int is_nagnag(gf_tscript_t *tr, variant_t *var)
 static void check_intron(gf_tscript_t *tr, tscript_t *tx, variant_t *var, int csq, uint32_t beg, uint32_t end)
 {
     int fwd = tr->strand==STRAND_FWD;
-    if ( end - beg + 1 < MIN_INTRON_SIZE ) add_tag("SMALL_INTRON", FILTER);
+    if ( end - beg + 1 < MIN_INTRON_SIZE ) add_tag("small_intron", FILTER);
     if ( csq & (LOF_DONOR|LOF_ACCEPTOR) )
     {
         char donor[3], acceptor[3];
@@ -711,12 +713,12 @@ static void check_intron(gf_tscript_t *tr, tscript_t *tx, variant_t *var, int cs
         // The alleles on the transcript strand
         char ref = fwd ? var->ref : complement(var->ref);
         char alt = fwd ? var->alt : complement(var->alt);
-        if ( csq & LOF_DONOR && var->ref && !strcmp(donor,"GC") && ref=='C' && alt=='T' ) add_tag("GC_TO_GT_DONOR", FILTER);
-        if ( strcmp(donor,"GT") || strcmp(acceptor,"AG") ) add_tag("NON_CAN_SPLICE", FLAG);
-        if ( fwd ? var->end < tx->cds_beg : var->beg > tx->cds_end ) add_tag("5UTR_SPLICE", FILTER);
-        if ( fwd ? var->beg > tx->cds_end : var->end < tx->cds_beg ) add_tag("3UTR_SPLICE", FILTER);
+        if ( csq & LOF_DONOR && var->ref && !strcmp(donor,"GC") && ref=='C' && alt=='T' ) add_tag("gc_to_gt_donor", FILTER);
+        if ( strcmp(donor,"GT") || strcmp(acceptor,"AG") ) add_tag("non_can_splice", FLAG);
+        if ( fwd ? var->end < tx->cds_beg : var->beg > tx->cds_end ) add_tag("5utr_splice", FILTER);
+        if ( fwd ? var->beg > tx->cds_end : var->end < tx->cds_beg ) add_tag("3utr_splice", FILTER);
     }
-    if ( csq & LOF_ACCEPTOR && var->ref && is_nagnag(tr, var) ) add_tag("NAGNAG_SITE", FLAG);
+    if ( csq & LOF_ACCEPTOR && var->ref && is_nagnag(tr, var) ) add_tag("nagnag_site", FLAG);
 }
 
 // The ancestral allele is the one of the purported loss of function. SNVs only, as LOFTEE
@@ -725,7 +727,7 @@ static void check_ancestral(variant_t *var)
     if ( !args.chr_anc ) { args.nno_ancestral++; return; }
     char base[2];
     if ( fetch_seq(args.anc, args.chr_anc, var->pos, var->pos, STRAND_FWD, base) < 0 ) return;
-    if ( base[0]==var->alt ) add_tag("ANC_ALLELE", FILTER);
+    if ( base[0]==var->alt ) add_tag("anc_allele", FILTER);
 }
 
 // The filters and flags in the order LOFTEE runs them
@@ -739,7 +741,7 @@ static const char *assess(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_
     {
         int iexon = find_exon(tx, var);
         ptc_t ptc;
-        if ( iexon < 0 ) add_tag("NO_EXON_NUMBER", FLAG);
+        if ( iexon < 0 ) add_tag("no_exon_number", FLAG);
         else
         {
             if ( locate_ptc(tr, tx, var, bcsq, &ptc)==0 )
@@ -747,8 +749,8 @@ static const char *assess(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_
                 check_truncation(tr, tx, var, &ptc);
                 args.csq_region = nmd_region(tx, &ptc);
             }
-            if ( tx->nexon==1 ) add_tag("SINGLE_EXON", FLAG);
-            else if ( tx->incomplete ) add_tag("INCOMPLETE_CDS", FILTER);
+            if ( tx->nexon==1 ) add_tag("single_exon", FLAG);
+            else if ( tx->incomplete ) add_tag("incomplete_cds", FILTER);
             check_phylocsf(tr, iexon);
         }
     }

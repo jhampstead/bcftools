@@ -66,13 +66,14 @@ Changes affecting specific commands:
 
     - New plugin to assess the loss-of-function consequences of `csq` like the
       LOFTEE plugin of VEP, adding INFO/LOF (HC or LC), INFO/LOF_FILTERS and
-      INFO/LOF_FLAGS for each INFO/BCSQ consequence. END_TRUNC follows the LOFTEE-2 cutoffs instead
-      of GERP, STOP_END_TRUNC filters frameshifts whose new stop codon escapes
-      NMD, there are no splice predictions, and the transcripts are read from
-      the Ensembl or GENCODE GFF3 used by `csq`. Local and haplotype-aware `csq`
-      output are both supported. INFO/LOF_REGION gives the NMD region of the
-      premature stop codon, adapted from Blakes et al. (2026) with the distal
-      region starting at the last coding exon
+      INFO/LOF_FLAGS for each INFO/BCSQ consequence. The filters and flags are
+      in lower case, like the consequences of `csq`. end_trunc follows the
+      LOFTEE-2 cutoffs instead of GERP, stop_end_trunc filters frameshifts whose
+      new stop codon escapes NMD, there are no splice predictions, and the
+      transcripts are read from the Ensembl or GENCODE GFF3 used by `csq`.
+      Local and haplotype-aware `csq` output are both supported. INFO/LOF_REGION
+      gives the NMD region of the premature stop codon, adapted from Blakes et
+      al. (2026) with the distal region starting at the last coding exon
 
 * bcftools +mendelian
 
