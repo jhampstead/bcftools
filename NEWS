@@ -70,7 +70,9 @@ Changes affecting specific commands:
       of GERP, STOP_END_TRUNC filters frameshifts whose new stop codon escapes
       NMD, there are no splice predictions, and the transcripts are read from
       the Ensembl or GENCODE GFF3 used by `csq`. Local and haplotype-aware `csq`
-      output are both supported
+      output are both supported. INFO/LOF_REGION gives the NMD region of the
+      premature stop codon, adapted from Blakes et al. (2026) with the distal
+      region starting at the last coding exon
 
 * bcftools +mendelian
 

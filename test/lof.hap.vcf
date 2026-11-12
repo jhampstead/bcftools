@@ -1,10 +1,10 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
-##contig=<ID=chr1,length=13312>
+##contig=<ID=chr1,length=18894>
 ##INFO=<ID=TEST,Number=1,Type=String,Description="Test case">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##bcftools/csqVersion=b91e918f-dirty+htslib-1.25-20-gae5f79dd
-##bcftools/csqCommand=csq -f lof.fa -g lof.gff lof.hap.raw.vcf; Date=Wed Nov 11 18:08:14 2026
+##bcftools/csqVersion=b4a639d9-dirty+htslib-1.25-20-gae5f79dd
+##bcftools/csqCommand=csq -f lof.fa -g lof.gff lof.hap.raw.vcf; Date=Thu Nov 12 10:14:48 2026
 ##INFO=<ID=BCSQ,Number=.,Type=String,Description="Haplotype-aware consequence annotation from BCFtools/csq, see http://samtools.github.io/bcftools/howtos/csq-calling.html for details. Format: Consequence|gene|transcript|biotype|strand|amino_acid_change|dna_change">
 ##FORMAT=<ID=BCSQ,Number=.,Type=Integer,Description="Bitmask of indexes to INFO/BCSQ, with interleaved first/second haplotype. Use \"bcftools query -f'[%CHROM\t%POS\t%SAMPLE\t%TBCSQ\n]'\" to translate.">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S1
