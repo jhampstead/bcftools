@@ -570,6 +570,7 @@ static int gff_parse_line(gff_t *gff, char *line, ftr_t *ftr)
     else if ( !strncmp("three_prime_UTR\t",ss,16) ) { ftr->type = GF_UTR3; ss += 16; }
     else if ( !strncmp("five_prime_UTR\t",ss,15) ) { ftr->type = GF_UTR5; ss += 15; }
     else if ( !strncmp("biological_region\t",ss,18) ) { return -1; }    // skip
+    else if ( !strncmp("start_codon\t",ss,12) || !strncmp("stop_codon",ss,10) ) { return -1; } // GENCODE, skip
     else if ( !strncmp("gene\t",ss,5) ) { is_gene_line = 1; ss += 5; }
     else ss = gff_skip(line, ss);
     aux->type_end = ss - 1;
@@ -622,6 +623,10 @@ static int gff_parse_line(gff_t *gff, char *line, ftr_t *ftr)
         else if ( !strncmp(ss,"biotype=",8) ) { aux->biotype = ss + 8; aux->biotype_end = es - 1; }
         else if ( !strncmp(ss,"gene_biotype=",13) ) { aux->biotype = ss + 13; aux->biotype_end = es - 1; }
         else if ( !strncmp(ss,"constitutive=",13) ) { ftr->constitutive = ss[13]=='1' ? 1 : 0; }
+        // GENCODE names. The transcript lines have both types, the transcript's must win
+        else if ( !strncmp(ss,"transcript_type=",16) ) { aux->biotype = ss + 16; aux->biotype_end = es - 1; }
+        else if ( !strncmp(ss,"gene_type=",10) && !aux->biotype ) { aux->biotype = ss + 10; aux->biotype_end = es - 1; }
+        else if ( !strncmp(ss,"gene_name=",10) && !aux->name ) { aux->name = ss + 10; aux->name_end = es - 1; }
         if ( !*es ) break;
         ss = es + 1;
     }

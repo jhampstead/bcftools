@@ -35,6 +35,10 @@ Changes affecting specific commands:
     - Fix a segfault caused by incorrect handling of symbolic ALT alleles.
       Support symbolic alleles at multiallelic sites.
 
+    - Read GENCODE GFF3 files directly: the biotype and gene name are taken
+      from transcript_type, gene_type and gene_name when the Ensembl attributes
+      are absent, and start_codon and stop_codon lines are skipped
+
 * bcftools consensus
 
     - Fix -M masking of symbolic deletions and mixed multiallelic sites,
@@ -57,6 +61,16 @@ Changes affecting specific commands:
 * bcftools index
 
     - Make `--nrecords` with non-standard file extensions (#2588)
+
+* bcftools +lof
+
+    - New plugin to assess the loss-of-function consequences of `csq` like the
+      LOFTEE plugin of VEP, adding INFO/LOF (HC or LC), INFO/LOF_FILTERS and
+      INFO/LOF_FLAGS for each INFO/BCSQ consequence. END_TRUNC follows the LOFTEE-2 cutoffs instead
+      of GERP, STOP_END_TRUNC filters frameshifts whose new stop codon escapes
+      NMD, there are no splice predictions, and the transcripts are read from
+      the Ensembl or GENCODE GFF3 used by `csq`. Local and haplotype-aware `csq`
+      output are both supported
 
 * bcftools +mendelian
 

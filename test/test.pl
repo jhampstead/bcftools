@@ -841,6 +841,10 @@ run_test(\&test_vcf_plugin,$opts,in=>'remove-overlaps.3',out=>'remove-overlaps.3
 run_test(\&test_vcf_plugin,$opts,in=>'remove-overlaps.3',out=>'remove-overlaps.3.2.out',cmd=>'+remove-overlaps',args=>q[-m 'min(QUAL)' -M rmme --missing DP]);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.icase.1',out=>'split-vep.icase.1.1.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation_Impact -S {PATH}/split-vep.icase.1.severity -s :MODERATE+ -f '%Annotation_Impact\\n']);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.icase.1',out=>'split-vep.icase.1.1.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation_Impact -S {PATH}/split-vep.icase.1.severity -s :moderate+ -f '%Annotation_Impact\\n']);
+run_test(\&test_vcf_plugin,$opts,in=>'lof',out=>'lof.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.gencode',out=>'lof.gencode.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.brief',out=>'lof.brief.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.12',out=>'split-vep.12.1.out',cmd=>'+split-vep',args=>qq[-s all:any:worst -f '%CHROM\\t%POS\\t%Annotation\\n' | grep -v ^#]);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.11',out=>'split-vep.11.1.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation -a XXX -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%XXX\\n' -d -A tab | grep -v ^#]);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.11',out=>'split-vep.11.2.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation -a XXX -f '%POS %xAnnotation\\n' -p x | grep -v ^#]);
@@ -1121,6 +1125,7 @@ run_test(\&test_cmd,$opts,out=>'mpileup/mpileup.progress.1.out',cmd=>"$$opts{bin
 run_test(\&test_mpileup,$opts,in=>[qw(mwu-biasZ.1)],ref=>'mwu-biasZ.1.fa',out=>'mpileup/mwu-biasZ.1.1.out',args=>q[-B -d 100000 -a -AD -r ref:150]);   # 1300 reads in one MAPQ bin: the tie term overflowed 32-bit int
 run_test(\&test_csq,$opts,in=>'csq.exons.1',out=>'csq.exons.1.1.out',pipe=>'grep -v ^#',cmd=>'-f {PATH}/csq.exons.1.fa -g {PATH}/csq.exons.1.gff -F all');
 run_test(\&test_csq,$opts,in=>'csq.exons.1',out=>'csq.exons.1.2.out',pipe=>'grep -v ^#',cmd=>'-f {PATH}/csq.exons.1.fa -g {PATH}/csq.exons.1.gff -F all -l');
+run_test(\&test_csq,$opts,in=>'lof.raw',out=>'lof.raw.gencode.out',pipe=>'grep -v ^#',cmd=>'-l -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff');
 run_test(\&test_csq,$opts,in=>'csq.mig',out=>'csq.mig.1.out',pipe=>'grep -v ^#',cmd=>'-f {PATH}/csq.mig.fa -g {PATH}/csq.mig.gff --allow mig');
 run_test(\&test_csq,$opts,in=>'csq.greedy.1',out=>'csq.greedy.1.1.out',pipe=>'grep -v ^#',cmd=>'-f {PATH}/csq.greedy.1.fa -g {PATH}/csq.greedy.1.gff -pa');
 run_test(\&test_csq,$opts,in=>'csq.greedy.1',out=>'csq.greedy.1.2.out',pipe=>'grep -v ^#',cmd=>'-f {PATH}/csq.greedy.1.fa -g {PATH}/csq.greedy.1.gff -pa -G1');
