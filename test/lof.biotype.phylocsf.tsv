@@ -1,0 +1,5 @@
+transcript	gene	exon	max_score	corresponding_orf_score	max_frame
+T1	G1	1	12.0	10.1	0
+T1	G1	2	-2.0	-5.0	0
+T2	G1	1	12.0	10.1	0
+T2	G1	2	-2.0	-5.0	0

@@ -3,9 +3,12 @@
     A reimplementation of the LOFTEE plugin of Ensembl VEP (v1.0.4_GRCh38,
     https://github.com/konradjk/loftee) for the consequences in INFO/BCSQ. Each
     stop_gained, frameshift, splice_donor and splice_acceptor consequence of a
-    protein-coding transcript is high confidence (HC) unless one of the LOFTEE
-    filters applies, which makes it low confidence (LC). The flags are only
-    informative. They go to INFO/LOF, INFO/LOF_FILTERS and INFO/LOF_FLAGS.
+    transcript of biotype protein_coding is high confidence (HC) unless one of
+    the LOFTEE filters applies, which makes it low confidence (LC). The flags are
+    only informative. They go to INFO/LOF, INFO/LOF_FILTERS and INFO/LOF_FLAGS.
+    As in LOFTEE, the other coding biotypes are not assessed: protein_coding_LoF,
+    nonsense_mediated_decay, non_stop_decay, polymorphic_pseudogene and the IG
+    and TR genes.
 
     Where this differs from LOFTEE:
         - the filters and flags are in lower case, like the consequences of
@@ -168,7 +171,8 @@ const char *usage(void)
         "       Adds INFO/LOF with HC or LC, INFO/LOF_FILTERS with the LOFTEE filters that make it LC,\n"
         "       INFO/LOF_FLAGS with the informative LOFTEE flags and INFO/LOF_REGION with the NMD region of\n"
         "       the premature stop codon (Blakes et al. 2026), one value per INFO/BCSQ consequence and '.'\n"
-        "       for consequences that are not a loss of function or have no filters or flags.\n"
+        "       for consequences that are not a loss of function or have no filters or flags. Only\n"
+        "       transcripts of biotype protein_coding are assessed, as by LOFTEE.\n"
         "       Works with local and haplotype-aware csq output; a compound consequence is assessed\n"
         "       where csq prints it, and the \"@POS\" references to it are '.'. Multiallelic records are\n"
         "       skipped, split them before running bcftools csq.\n"
