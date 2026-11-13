@@ -34,6 +34,11 @@
     INFO/LOF_REGION adds the NMD region of the premature stop codon, as defined in
     Blakes et al., Regional nonsense constraint offers biological and clinical
     insights into genetic disease, Nat Commun 17, 3152 (2026).
+
+    With --info, INFO/LOF_INFO gives the values behind the filters and flags, as
+    LoF_info does in LOFTEE: the distances of the truncation filters, the PhyloCSF
+    scores of the exon (LOFTEE's ANN_ORF and MAX_ORF, or PHYLOCSF_TOO_SHORT when the
+    exon has none) and the size of the intron (INTRON_SIZE).
 */
 
 #include <stdio.h>
@@ -96,7 +101,7 @@ tscript_t;
 typedef struct
 {
     int nexon;
-    float *orf, *max;       // corresponding_orf_score and max_score by exon, NAN if missing
+    double *orf, *max;      // corresponding_orf_score and max_score by exon, NAN if missing
 }
 phylocsf_t;
 
@@ -146,8 +151,9 @@ typedef struct
     kstring_t chr_gff_str, chr_ref_str, chr_anc_str;
     char *bcsq;
     int mbcsq;
-    kstring_t lof, filters, flags, region;  // INFO tags of the current record
-    kstring_t csq_filters, csq_flags;       // of the current consequence
+    kstring_t lof, filters, flags, region, info;    // INFO tags of the current record
+    kstring_t csq_filters, csq_flags, csq_info;     // of the current consequence
+    int write_info;                                 // --info: INFO/LOF_INFO
     const char *csq_region;
     kstring_t tmp;
     indel_t *indel;
@@ -172,7 +178,8 @@ const char *usage(void)
         "       INFO/LOF_FLAGS with the informative LOFTEE flags and INFO/LOF_REGION with the NMD region of\n"
         "       the premature stop codon (Blakes et al. 2026), one value per INFO/BCSQ consequence and '.'\n"
         "       for consequences that are not a loss of function or have no filters or flags. Only\n"
-        "       transcripts of biotype protein_coding are assessed, as by LOFTEE.\n"
+        "       transcripts of biotype protein_coding are assessed, as by LOFTEE. With --info, also\n"
+        "       INFO/LOF_INFO with the values behind the filters and flags, like LoF_info of LOFTEE.\n"
         "       Works with local and haplotype-aware csq output; a compound consequence is assessed\n"
         "       where csq prints it, and the \"@POS\" references to it are '.'. Multiallelic records are\n"
         "       skipped, split them before running bcftools csq.\n"
@@ -186,6 +193,18 @@ const char *usage(void)
         "   -f, --fasta-ref FILE        Reference sequence in fasta format\n"
         "       --force                 Skip transcripts with an inconsistent CDS phase, as bcftools csq --force\n"
         "   -g, --gff-annot FILE        The GFF3 annotation given to bcftools csq, Ensembl or GENCODE\n"
+        "       --info                  Add INFO/LOF_INFO, key:value pairs per consequence separated by '&':\n"
+        "                                 dist_last_exon       the LOFTEE-2 distance of the variant from the\n"
+        "                                                      start of the last exon (end_trunc)\n"
+        "                                 stop_dist_last_exon  the same for the new stop codon of a frameshift\n"
+        "                                                      (stop_end_trunc)\n"
+        "                                 dist_cds_start       the LOFTEE-2 distance of the premature stop codon\n"
+        "                                                      from the start of the CDS (start_trunc)\n"
+        "                                 dist_tscript_end     the distance of the variant from the end of a\n"
+        "                                                      single-exon transcript (end_trunc)\n"
+        "                                 ann_orf, max_orf     the PhyloCSF scores of the exon, or\n"
+        "                                 phylocsf_too_short   if it has none, as in LOFTEE (phylocsf_*)\n"
+        "                                 intron_size          the size of the intron (small_intron)\n"
         "   -p, --phylocsf FILE         PhyloCSF scores of the exons, tab-delimited with a header naming the\n"
         "                               columns transcript, exon, corresponding_orf_score and max_score\n"
         "\n"
@@ -325,7 +344,7 @@ static tscript_t *tscript_get(gf_tscript_t *tr)
     tx->cds_tend = tscript_offset(tr, tx, fwd ? end : beg, NULL);
     if ( tx->cds_tbeg < 0 || tx->cds_tend < tx->cds_tbeg ) return tx;
 
-    // The CDS includes the stop codon in Ensembl GFFs but not in GENCODE
+    // The CDS includes the stop codon in Ensembl and GENCODE GFF3 files, but GTF-style annotations leave it out
     char codon[4];
     int has_stop = !tscript_seq(tr, tx, tx->cds_tend - 2, 3, codon) && is_stop(codon);
     if ( !has_stop && !tr->trim && !tscript_seq(tr, tx, tx->cds_tend + 1, 3, codon) && is_stop(codon) )
@@ -512,6 +531,30 @@ static void add_tag(const char *tag, int is_filter)
     kputs(tag, str);
 }
 
+// A key:value pair of INFO/LOF_INFO, or a key alone if value is NULL
+static void add_info(const char *key, const char *value)
+{
+    if ( !args.write_info ) return;
+    if ( args.csq_info.l ) kputc('&', &args.csq_info);
+    kputs(key, &args.csq_info);
+    if ( value ) { kputc(':', &args.csq_info); kputs(value, &args.csq_info); }
+}
+static void add_info_int(const char *key, int value)
+{
+    if ( !args.write_info ) return;
+    args.tmp.l = 0;
+    kputw(value, &args.tmp);
+    add_info(key, args.tmp.s);
+}
+static void add_info_score(const char *key, double value)
+{
+    if ( !args.write_info ) return;
+    args.tmp.l = 0;
+    if ( isnan(value) ) kputc('.', &args.tmp);
+    else ksprintf(&args.tmp, "%.15g", value);     // as in the PhyloCSF file, up to trailing zeros
+    add_info(key, args.tmp.s);
+}
+
 // The first exon in the transcript order that the variant overlaps, -1 if none
 static int find_exon(tscript_t *tx, variant_t *var)
 {
@@ -572,6 +615,8 @@ static int cmp_indel(const void *a, const void *b)
     The translation goes no further than the end of the CDS, so a protein without the stop means the
     frame reads through into the 3' UTR. The stop is located in the CDS of the haplotype, then moved
     back by the indels upstream of it; a haplotype-aware compound can list indels past the stop too.
+    A frame that reads through, or stops over the stop codon of the CDS, ends with the CDS: where csq's
+    protein ends depends on whether the GFF's CDS includes the stop codon.
 */
 static int frameshift_stop(gf_tscript_t *tr, tscript_t *tx, bcsq_t *bcsq)
 {
@@ -610,7 +655,7 @@ static int frameshift_stop(gf_tscript_t *tr, tscript_t *tx, bcsq_t *bcsq)
         cds_off -= args.indel[i].dlen;
 
     int toff = tx->cds_tbeg + cds_off;
-    return toff < tx->tlen ? toff : tx->tlen - 1;
+    return toff >= tx->cds_tend - 3 ? tx->cds_tend : toff;
 }
 
 // The variant and its premature stop codon, -1 if the variant is past the last exon. The stop of a
@@ -639,7 +684,7 @@ static int locate_ptc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *b
     to the frameshift itself and stop_end_trunc to the stop. There is no NMD to escape in single-exon
     transcripts, hence no stop_end_trunc there.
 */
-static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc)
+static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc, int frameshift)
 {
     int from_start = ptc->stop - tx->cds_tbeg - (ptc->istop - tx->cds_ibeg);
 
@@ -647,13 +692,21 @@ static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, pt
     {
         uint32_t tend = tr->strand==STRAND_FWD ? tr->end : tr->beg;
         uint32_t to_end = var->pos > tend ? var->pos - tend : tend - var->pos;
+        add_info_int("dist_tscript_end", to_end);
+        add_info_int("dist_cds_start", from_start);
         if ( to_end <= MIN_DIST_TSCRIPT_END ) add_tag("end_trunc", FILTER);
         if ( from_start <= MIN_DIST_CDS_START_1EX ) add_tag("start_trunc", FILTER);
         return;
     }
 
-    if ( dist_last_exon(tx, ptc->var, ptc->ivar) <= MIN_DIST_LAST_EXON ) add_tag("end_trunc", FILTER);
-    else if ( dist_last_exon(tx, ptc->stop, ptc->istop) <= MIN_DIST_LAST_EXON ) add_tag("stop_end_trunc", FILTER);
+    int var_to_last  = dist_last_exon(tx, ptc->var, ptc->ivar);
+    int stop_to_last = dist_last_exon(tx, ptc->stop, ptc->istop);
+    add_info_int("dist_last_exon", var_to_last);
+    if ( frameshift ) add_info_int("stop_dist_last_exon", stop_to_last);
+    add_info_int("dist_cds_start", from_start);
+
+    if ( var_to_last <= MIN_DIST_LAST_EXON ) add_tag("end_trunc", FILTER);
+    else if ( stop_to_last <= MIN_DIST_LAST_EXON ) add_tag("stop_end_trunc", FILTER);
     if ( from_start <= MIN_DIST_CDS_START ) add_tag("start_trunc", FILTER);
 }
 
@@ -685,9 +738,15 @@ static void check_phylocsf(gf_tscript_t *tr, int iexon)
     kputsn(id, strcspn(id,"."), &args.tmp);
 
     int idx;
-    if ( khash_str2int_get(args.phylo_idx, args.tmp.s, &idx) < 0 ) return;
-    phylocsf_t *phylo = &args.phylo[idx];
-    if ( iexon >= phylo->nexon || isnan(phylo->orf[iexon]) || phylo->orf[iexon] >= 0 ) return;
+    phylocsf_t *phylo = khash_str2int_get(args.phylo_idx, args.tmp.s, &idx) < 0 ? NULL : &args.phylo[idx];
+    if ( !phylo || iexon >= phylo->nexon || isnan(phylo->orf[iexon]) )
+    {
+        add_info("phylocsf_too_short", NULL);      // LOFTEE's name for an exon without scores
+        return;
+    }
+    add_info_score("ann_orf", phylo->orf[iexon]);
+    add_info_score("max_orf", phylo->max[iexon]);
+    if ( phylo->orf[iexon] >= 0 ) return;
     add_tag(phylo->max[iexon] > 0 ? "phylocsf_unlikely_orf" : "phylocsf_weak", FLAG);
 }
 
@@ -705,6 +764,7 @@ static int is_nagnag(gf_tscript_t *tr, variant_t *var)
 static void check_intron(gf_tscript_t *tr, tscript_t *tx, variant_t *var, int csq, uint32_t beg, uint32_t end)
 {
     int fwd = tr->strand==STRAND_FWD;
+    add_info_int("intron_size", end - beg + 1);
     if ( end - beg + 1 < MIN_INTRON_SIZE ) add_tag("small_intron", FILTER);
     if ( csq & (LOF_DONOR|LOF_ACCEPTOR) )
     {
@@ -737,7 +797,7 @@ static void check_ancestral(variant_t *var)
 static const char *assess(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *bcsq)
 {
     int csq = bcsq->type;
-    args.csq_filters.l = args.csq_flags.l = 0;
+    args.csq_filters.l = args.csq_flags.l = args.csq_info.l = 0;
     args.csq_region = "other";     // a splice site of a coding intron: where it stops depends on the splicing
 
     if ( csq & (LOF_STOP_GAINED|LOF_FRAMESHIFT) )
@@ -749,7 +809,7 @@ static const char *assess(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_
         {
             if ( locate_ptc(tr, tx, var, bcsq, &ptc)==0 )
             {
-                check_truncation(tr, tx, var, &ptc);
+                check_truncation(tr, tx, var, &ptc, csq & LOF_FRAMESHIFT);
                 args.csq_region = nmd_region(tx, &ptc);
             }
             if ( tx->nexon==1 ) add_tag("single_exon", FLAG);
@@ -844,6 +904,7 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
         {"fasta-ref",required_argument,NULL,'f'},
         {"force",no_argument,NULL,1},
         {"gff-annot",required_argument,NULL,'g'},
+        {"info",no_argument,NULL,2},
         {"phylocsf",required_argument,NULL,'p'},
         {NULL,0,NULL,0}
     };
@@ -857,6 +918,7 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
             case 'g': gff_fname = optarg; break;
             case 'p': phylo_fname = optarg; break;
             case  1 : force = 1; break;
+            case  2 : args.write_info = 1; break;
             case 'h':
             case '?':
             default: error("%s", usage()); break;
@@ -869,11 +931,11 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
 
     if ( !bcf_hdr_idinfo_exists(in, BCF_HL_INFO, bcf_hdr_id2int(in, BCF_DT_ID, args.csq_tag)) )
         error("The INFO/%s tag is not in the header, run bcftools csq first\n", args.csq_tag);
-    const char *tags[] = { "LOF", "LOF_FILTERS", "LOF_FLAGS", "LOF_REGION" };
-    for (c=0; c<4; c++)
+    const char *tags[] = { "LOF", "LOF_FILTERS", "LOF_FLAGS", "LOF_REGION", "LOF_INFO" };
+    for (c=0; c<5; c++)
         if ( bcf_hdr_idinfo_exists(in, BCF_HL_INFO, bcf_hdr_id2int(in, BCF_DT_ID, tags[c])) )
             error("The input has INFO/%s already, remove it with "
-                "\"bcftools annotate -x INFO/LOF,INFO/LOF_FILTERS,INFO/LOF_FLAGS,INFO/LOF_REGION\"\n", tags[c]);
+                "\"bcftools annotate -x INFO/LOF,INFO/LOF_FILTERS,INFO/LOF_FLAGS,INFO/LOF_REGION,INFO/LOF_INFO\"\n", tags[c]);
 
     if ( !(args.ref = fai_load(ref_fname)) ) error("Failed to load the fasta index of %s\n", ref_fname);
     if ( !(args.anc = fai_load(anc_fname)) ) error("Failed to load the fasta index of %s\n", anc_fname);
@@ -896,6 +958,13 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
     bcf_hdr_printf(out, "##INFO=<ID=LOF_REGION,Number=.,Type=String,Description=\"NMD region of the premature stop codon of each %s "
         "consequence (Blakes et al. 2026): start_proximal, distal, long_exon or nmd_target; non_coding for a splice site "
         "of a UTR intron, other for a splice site of a coding intron\">", args.csq_tag);
+    if ( args.write_info )
+        bcf_hdr_printf(out, "##INFO=<ID=LOF_INFO,Number=.,Type=String,Description=\"Values behind the LOFTEE filters and flags of "
+            "each %s consequence, key:value pairs separated by '&', '.' if none: dist_last_exon and stop_dist_last_exon, the "
+            "LOFTEE-2 distances of the variant and of the new stop codon of a frameshift from the start of the last exon; "
+            "dist_cds_start, of the premature stop codon from the start of the CDS; dist_tscript_end, of the variant from the "
+            "end of a single-exon transcript; ann_orf and max_orf, the PhyloCSF scores of the exon, or phylocsf_too_short "
+            "if it has none; intron_size\">", args.csq_tag);
     return 0;
 }
 
@@ -921,7 +990,7 @@ bcf1_t *process(bcf1_t *rec)
 
     int nlof = 0, i;
     char *bcsq = args.bcsq;
-    args.lof.l = args.filters.l = args.flags.l = args.region.l = 0;
+    args.lof.l = args.filters.l = args.flags.l = args.region.l = args.info.l = 0;
     for (i=0; bcsq; i++)
     {
         char *next = strchr(bcsq, ',');
@@ -932,6 +1001,7 @@ bcf1_t *process(bcf1_t *rec)
         push_value(&args.filters, i, lof && args.csq_filters.l ? args.csq_filters.s : NULL);
         push_value(&args.flags, i, lof && args.csq_flags.l ? args.csq_flags.s : NULL);
         push_value(&args.region, i, lof ? args.csq_region : NULL);
+        push_value(&args.info, i, lof && args.csq_info.l ? args.csq_info.s : NULL);
         bcsq = next;
     }
     if ( !nlof ) return rec;
@@ -939,7 +1009,8 @@ bcf1_t *process(bcf1_t *rec)
     if ( bcf_update_info_string(args.hdr_out, rec, "LOF", args.lof.s) < 0 ||
          bcf_update_info_string(args.hdr_out, rec, "LOF_FILTERS", args.filters.s) < 0 ||
          bcf_update_info_string(args.hdr_out, rec, "LOF_FLAGS", args.flags.s) < 0 ||
-         bcf_update_info_string(args.hdr_out, rec, "LOF_REGION", args.region.s) < 0 )
+         bcf_update_info_string(args.hdr_out, rec, "LOF_REGION", args.region.s) < 0 ||
+         (args.write_info && bcf_update_info_string(args.hdr_out, rec, "LOF_INFO", args.info.s) < 0) )
         error("Failed to update INFO/LOF at %s:%"PRIhts_pos"\n", bcf_seqname(args.hdr_in, rec), rec->pos + 1);
     return rec;
 }
@@ -968,8 +1039,10 @@ void destroy(void)
     free(args.filters.s);
     free(args.flags.s);
     free(args.region.s);
+    free(args.info.s);
     free(args.csq_filters.s);
     free(args.csq_flags.s);
+    free(args.csq_info.s);
     free(args.tmp.s);
     free(args.indel);
 }

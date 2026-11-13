@@ -79,7 +79,8 @@ Changes affecting specific commands:
       transcripts are read from the Ensembl or GENCODE GFF3 used by `csq`.
       Local and haplotype-aware `csq` output are both supported. INFO/LOF_REGION
       gives the NMD region of the premature stop codon as defined by Blakes et
-      al. (2026)
+      al. (2026), and with `--info`, INFO/LOF_INFO gives the values behind the
+      filters and flags, like LoF_info of LOFTEE
 
 * bcftools +mendelian
 

@@ -845,6 +845,9 @@ run_test(\&test_vcf_plugin,$opts,in=>'lof',out=>'lof.out',cmd=>'+lof',args=>'-- 
 run_test(\&test_vcf_plugin,$opts,in=>'lof.gencode',out=>'lof.gencode.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.brief',out=>'lof.brief.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv');
+run_test(\&test_vcf_plugin,$opts,in=>'lof',out=>'lof.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.gencode',out=>'lof.gencode.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.biotype',out=>'lof.biotype.out',cmd=>'+lof',args=>'-- -f {PATH}/csq/EDUMMY0004/EDUMMY0004.fa -g {PATH}/csq/EDUMMY0004/EDUMMY0004.gff -a {PATH}/lof.biotype.anc.fa -p {PATH}/lof.biotype.phylocsf.tsv');
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.12',out=>'split-vep.12.1.out',cmd=>'+split-vep',args=>qq[-s all:any:worst -f '%CHROM\\t%POS\\t%Annotation\\n' | grep -v ^#]);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.11',out=>'split-vep.11.1.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation -a XXX -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%XXX\\n' -d -A tab | grep -v ^#]);
