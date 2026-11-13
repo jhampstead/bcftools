@@ -80,7 +80,11 @@ Changes affecting specific commands:
       Local and haplotype-aware `csq` output are both supported. INFO/LOF_REGION
       gives the NMD region of the premature stop codon as defined by Blakes et
       al. (2026), and with `--info`, INFO/LOF_INFO gives the values behind the
-      filters and flags, like LoF_info of LOFTEE
+      filters and flags, like LoF_info of LOFTEE. With `--gerp`, end_trunc is
+      that of LOFTEE, from the GERP scores the new script misc/lof-gerp.py
+      extracts from LOFTEE's bigWig file, with the zoom records the bigWig
+      library averages them from, so that the GERP-weighted distances are the
+      same as LOFTEE's
 
 * bcftools +mendelian
 

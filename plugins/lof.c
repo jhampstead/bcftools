@@ -17,8 +17,8 @@
           GENCODE, rather than from the Ensembl API
         - end_trunc follows LOFTEE-2 (the relaxed cutoffs of the gnomAD v4
           flagship paper) instead of the GERP-weighted distance to the stop
-          codon, and start_trunc filters a truncation too close to the start of
-          the CDS, as LOFTEE-2 does
+          codon, unless --gerp is given, and start_trunc filters a truncation
+          too close to the start of the CDS, as LOFTEE-2 does
         - for a frameshift, start_trunc is measured from the new stop codon,
           located from the protein predicted by csq, and stop_end_trunc filters
           a frameshift whose new stop falls where end_trunc would apply
@@ -34,6 +34,15 @@
     INFO/LOF_REGION adds the NMD region of the premature stop codon, as defined in
     Blakes et al., Regional nonsense constraint offers biological and clinical
     insights into genetic disease, Nat Commun 17, 3152 (2026).
+
+    With --gerp, end_trunc is that of LOFTEE instead: within 50 bp of the last
+    coding exon by LOFTEE's distance and with a GERP-weighted distance of -58 or
+    less. The scores come from a file made by misc/lof-gerp.py from the GERP
+    bigWig file of LOFTEE, with the zoom records Jim Kent's bigWig library
+    averages the scores from, so that the distances are computed as in LOFTEE,
+    including that its distance runs through the exons of the 3' UTR and that
+    the stop codon is the end of the CDS given in the GFF. start_trunc and
+    stop_end_trunc stay those of LOFTEE-2.
 
     With --info, INFO/LOF_INFO gives the values behind the filters and flags, as
     LoF_info does in LOFTEE: the distances of the truncation filters, the PhyloCSF
@@ -54,6 +63,8 @@
 #include <htslib/kstring.h>
 #include <htslib/kseq.h>
 #include <htslib/khash_str2int.h>
+#include <htslib/tbx.h>
+#include <limits.h>
 #include "bcftools.h"
 #include "regidx.h"
 #include "gff.h"
@@ -65,6 +76,9 @@
 #define MIN_DIST_TSCRIPT_END   200      // the end of the transcript, single-exon transcripts
 
 #define MIN_INTRON_SIZE 15
+
+// LOFTEE's end_trunc with --gerp: a GERP-weighted distance to the stop codon of at most this
+#define GERP_END_TRUNC  -58
 
 // The NMD regions of Blakes et al., in the order they take precedence
 #define NMD_START_PROXIMAL  150     // start_proximal: at most this many bases from the start of the CDS
@@ -94,6 +108,7 @@ typedef struct
     int cds_tbeg, cds_tend;     // the CDS as transcript offsets, including the stop codon
     int cds_ibeg;               // the first coding exon
     uint32_t cds_beg, cds_end;  // the CDS in genomic coordinates
+    uint32_t gff_beg, gff_end;  // the CDS as given in the GFF, with or without the stop codon
     int incomplete;
 }
 tscript_t;
@@ -135,6 +150,18 @@ typedef struct
 }
 ptc_t;
 
+// GERP scores and zoom records made by misc/lof-gerp.py from a bigWig file
+typedef struct
+{
+    char *fname;
+    htsFile *fp;
+    tbx_t *tbx;
+    int *zoom, nzoom;       // the reduction levels of the bigWig file, in its order
+    void *chroms;           // the chromosomes of the bigWig file
+    kstring_t line;
+}
+gerp_t;
+
 typedef struct
 {
     bcf_hdr_t *hdr_in, *hdr_out;
@@ -147,13 +174,15 @@ typedef struct
     phylocsf_t *phylo;
     int nphylo, mphylo;
     int rid;                // the current chromosome and its names in the GFF and the fasta files
-    const char *chr_gff, *chr_ref, *chr_anc;
-    kstring_t chr_gff_str, chr_ref_str, chr_anc_str;
+    const char *chr_gff, *chr_ref, *chr_anc, *chr_gerp;
+    kstring_t chr_gff_str, chr_ref_str, chr_anc_str, chr_gerp_str;
     char *bcsq;
     int mbcsq;
     kstring_t lof, filters, flags, region, info;    // INFO tags of the current record
     kstring_t csq_filters, csq_flags, csq_info;     // of the current consequence
     int write_info;                                 // --info: INFO/LOF_INFO
+    gerp_t *gerp;                                   // --gerp: LOFTEE's end_trunc
+    int gerp_tid;                                   // the current chromosome in the GERP file
     const char *csq_region;
     kstring_t tmp;
     indel_t *indel;
@@ -192,6 +221,10 @@ const char *usage(void)
         "   -c, --custom-tag STRING     The INFO tag written by bcftools csq [BCSQ]\n"
         "   -f, --fasta-ref FILE        Reference sequence in fasta format\n"
         "       --force                 Skip transcripts with an inconsistent CDS phase, as bcftools csq --force\n"
+        "       --gerp FILE             end_trunc as in LOFTEE instead of LOFTEE-2: by LOFTEE's distance from the stop\n"
+        "                               codon less the coding length of its exon, at most 50 bp, and a GERP-weighted\n"
+        "                               distance of at most -58, from GERP scores made by lof-gerp.py (see below).\n"
+        "                               start_trunc and stop_end_trunc stay those of LOFTEE-2\n"
         "   -g, --gff-annot FILE        The GFF3 annotation given to bcftools csq, Ensembl or GENCODE\n"
         "       --info                  Add INFO/LOF_INFO, key:value pairs per consequence separated by '&':\n"
         "                                 dist_last_exon       the LOFTEE-2 distance of the variant from the\n"
@@ -205,12 +238,18 @@ const char *usage(void)
         "                                 ann_orf, max_orf     the PhyloCSF scores of the exon, or\n"
         "                                 phylocsf_too_short   if it has none, as in LOFTEE (phylocsf_*)\n"
         "                                 intron_size          the size of the intron (small_intron)\n"
+        "                               With --gerp, dist_last_exon and dist_tscript_end are replaced by those of\n"
+        "                               LOFTEE's end_trunc, gerp_dist, bp_dist, dist_from_last_exon and 50_bp_rule\n"
         "   -p, --phylocsf FILE         PhyloCSF scores of the exons, tab-delimited with a header naming the\n"
         "                               columns transcript, exon, corresponding_orf_score and max_score\n"
         "\n"
         "Example:\n"
         "   # the PhyloCSF scores from the SQLite database of LOFTEE\n"
         "   sqlite3 -header -separator $'\\t' loftee.sql 'SELECT * FROM phylocsf_summary' | bgzip > phylocsf.tsv.gz\n"
+        "\n"
+        "   # the GERP scores for --gerp, from the GERP bigWig file of LOFTEE and the GFF3 given to csq and +lof\n"
+        "   lof-gerp.py -g annot.gff3.gz gerp_conservation_scores.homo_sapiens.GRCh38.bw | bgzip > gerp.tsv.gz\n"
+        "   tabix -p bed gerp.tsv.gz\n"
         "\n"
         "   bcftools csq -l -f ref.fa -g annot.gff3.gz in.vcf.gz -Ou | \\\n"
         "       bcftools +lof -Oz -o out.vcf.gz -- -f ref.fa -g annot.gff3.gz -a human_ancestor.fa.gz -p phylocsf.tsv.gz\n"
@@ -340,6 +379,8 @@ static tscript_t *tscript_get(gf_tscript_t *tr)
         if ( end < cds->beg + cds->len - 1 ) end = cds->beg + cds->len - 1;
     }
     int fwd = tr->strand==STRAND_FWD;
+    tx->gff_beg  = beg;
+    tx->gff_end  = end;
     tx->cds_tbeg = tscript_offset(tr, tx, fwd ? beg : end, NULL);
     tx->cds_tend = tscript_offset(tr, tx, fwd ? end : beg, NULL);
     if ( tx->cds_tbeg < 0 || tx->cds_tend < tx->cds_tbeg ) return tx;
@@ -480,8 +521,64 @@ static void phylocsf_destroy(void)
 }
 
 // The GFF and fasta files may name chromosomes with or without the "chr" prefix, independently of the VCF
+/*
+    The file of misc/lof-gerp.py: a bgzipped, tabix-indexed table of the scores (level 0) and zoom
+    records (level N, the reduction) of a bigWig file in the exons of a GFF (the regions of level -1),
+    with the zoom levels and the chromosomes of the bigWig file in the header.
+*/
+static void gerp_init(const char *fname)
+{
+    gerp_t *gerp = calloc(1, sizeof(*gerp));
+    gerp->fname  = strdup(fname);
+    gerp->chroms = khash_str2int_init();
+    if ( !(gerp->fp = hts_open(fname, "r")) ) error("Failed to open %s\n", fname);
+    if ( !(gerp->tbx = tbx_index_load(fname)) ) error("Failed to load the index of %s, run \"tabix -p bed %s\"\n", fname, fname);
+
+    int version = 0, mzoom = 0;
+    while ( hts_getline(gerp->fp, KS_SEP_LINE, &gerp->line) >= 0 && gerp->line.s[0]=='#' )
+    {
+        char *str = gerp->line.s;
+        if ( !strncmp(str, "##lof_gerp=", 11) ) version = atoi(str + 11);
+        else if ( !strncmp(str, "##zoom_levels=", 14) )
+        {
+            str += 14;
+            while ( *str )
+            {
+                char *end;
+                int zoom = strtol(str, &end, 10);
+                if ( end==str || zoom < 1 ) error("Could not parse the zoom levels of %s: %s\n", fname, gerp->line.s);
+                hts_expand(int, gerp->nzoom+1, mzoom, gerp->zoom);
+                gerp->zoom[gerp->nzoom++] = zoom;
+                str = *end==',' ? end + 1 : end;
+            }
+        }
+        else if ( !strncmp(str, "##chrom=", 8) )
+        {
+            char *colon = strrchr(str + 8, ':');
+            if ( !colon ) error("Could not parse the chromosome of %s: %s\n", fname, gerp->line.s);
+            *colon = 0;
+            if ( !khash_str2int_has_key(gerp->chroms, str + 8) ) khash_str2int_inc(gerp->chroms, strdup(str + 8));
+        }
+    }
+    if ( version!=1 ) error("The file %s was not made by lof-gerp.py\n", fname);
+    args.gerp = gerp;
+}
+static void gerp_destroy(void)
+{
+    gerp_t *gerp = args.gerp;
+    if ( !gerp ) return;
+    if ( hts_close(gerp->fp)!=0 ) error("Close failed: %s\n", gerp->fname);
+    tbx_destroy(gerp->tbx);
+    khash_str2int_destroy_free(gerp->chroms);
+    free(gerp->zoom);
+    free(gerp->line.s);
+    free(gerp->fname);
+    free(gerp);
+}
+
 static int gff_has(void *gff, const char *chr) { return gff_has_seq((gff_t*)gff, chr); }
 static int fai_has(void *fai, const char *chr) { return faidx_has_seq((faidx_t*)fai, chr); }
+static int gerp_has(void *gerp, const char *chr) { return khash_str2int_has_key(((gerp_t*)gerp)->chroms, chr); }
 
 static const char *find_chr(const char *chr, int (*has_chr)(void*,const char*), void *db, kstring_t *str)
 {
@@ -504,6 +601,11 @@ static void set_chr(int rid)
     args.chr_gff = find_chr(chr, gff_has, args.gff, &args.chr_gff_str);
     args.chr_ref = find_chr(chr, fai_has, args.ref, &args.chr_ref_str);
     args.chr_anc = find_chr(chr, fai_has, args.anc, &args.chr_anc_str);
+    if ( args.gerp )
+    {
+        args.chr_gerp = find_chr(chr, gerp_has, args.gerp, &args.chr_gerp_str);
+        args.gerp_tid = args.chr_gerp ? tbx_name2id(args.gerp->tbx, args.chr_gerp) : -1;
+    }
 }
 
 static void variant_init(variant_t *var, bcf1_t *rec)
@@ -676,6 +778,133 @@ static int locate_ptc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *b
 }
 
 /*
+    The GERP score of the bases a..b (1-based, inclusive, either order) as LOFTEE gets it in
+    get_interval_gerp: a one-bin summary from Bio::DB::BigWig, the mean times the length. Jim Kent's
+    library makes the summary (bbiSummaryArrayExtended) from the zoom level closest to, but not above,
+    half the length, or from the scores if there is none: a zoom record counts in proportion to its
+    overlap with the bases, and the scores are clipped to them. The count is then rounded up, with the
+    sum scaled to match. Computed in the same order, the result is the same to the last bit.
+*/
+static double gerp_interval(uint32_t a, uint32_t b)
+{
+    gerp_t *gerp = args.gerp;
+    uint32_t beg = (a < b ? a : b) - 1, end = a < b ? b : a, size = end - beg;
+
+    int i, zoom = 0, desired = size / 2, best = INT_MAX;
+    if ( desired > 1 )
+        for (i=0; i<gerp->nzoom; i++)
+        {
+            int diff = desired - gerp->zoom[i];
+            if ( diff >= 0 && diff < best ) best = diff, zoom = gerp->zoom[i];
+        }
+
+    hts_itr_t *itr = args.gerp_tid < 0 ? NULL : tbx_itr_queryi(gerp->tbx, args.gerp_tid, beg, end);
+    int covered = 0;
+    double count = 0, sum = 0;
+    while ( itr && tbx_itr_next(gerp->fp, gerp->tbx, itr, &gerp->line) >= 0 )
+    {
+        // chrom, beg, end, level, count, value
+        char *str = strchr(gerp->line.s, '\t'), *end_ptr;
+        if ( !str ) error("Could not parse %s: %s\n", gerp->fname, gerp->line.s);
+        uint32_t rbeg = strtoul(str + 1, &str, 10);
+        uint32_t rend = strtoul(str + 1, &str, 10);
+        int level = strtol(str + 1, &str, 10);
+        uint32_t n = strtoul(str + 1, &end_ptr, 10);
+        if ( *str!='\t' || (level >= 0 && *end_ptr!='\t') ) error("Could not parse %s: %s\n", gerp->fname, gerp->line.s);
+        str = end_ptr + 1;
+
+        if ( level < 0 )
+        {
+            if ( rbeg <= beg && rend >= end ) covered = 1;
+            continue;
+        }
+        if ( level!=zoom ) continue;
+        if ( zoom )
+        {
+            // a zoom record: n bases with data, str their sum (bbiSummarySlice)
+            int overlap = (rend < end ? rend : end) - (rbeg > beg ? rbeg : beg);
+            if ( overlap <= 0 ) continue;
+            double factor = (double)overlap / (rend - rbeg);
+            count += n * factor;
+            sum += strtof(str, NULL) * factor;
+            continue;
+        }
+        // scores of n bases each from rbeg, clipped to the query (bigWigIntervalQuery, bbiIntervalSlice)
+        uint32_t ibeg;
+        for (ibeg=rbeg; ibeg < rend; ibeg += n)
+        {
+            float val = strtof(str, &end_ptr);
+            if ( end_ptr==str ) error("Could not parse %s: %s\n", gerp->fname, gerp->line.s);
+            str = *end_ptr==',' ? end_ptr + 1 : end_ptr;
+            uint32_t s = ibeg > beg ? ibeg : beg, e = ibeg + n < end ? ibeg + n : end;
+            if ( s >= e ) continue;
+            int isize = e - s;
+            double factor = (double)isize / isize;
+            double weight = isize * factor;
+            count += weight;
+            sum += val * weight;
+        }
+    }
+    if ( itr ) hts_itr_destroy(itr);
+    if ( !covered )
+        error("The bases %s:%"PRIu32"-%"PRIu32" are not in the GERP file %s, make it with lof-gerp.py from the GFF given to +lof\n",
+            args.chr_gerp, beg+1, end, gerp->fname);
+    if ( count <= 0 ) return 0;
+
+    uint32_t nvalid = ceil(count);
+    double norm = (double)nvalid / count;
+    double sum_norm = sum * norm;
+    double mean = sum_norm / nvalid;
+    return (double)size * mean;
+}
+
+/*
+    LOFTEE's end_trunc, after get_gerp_weighted_dist and get_last_exon_coding_length: from the variant
+    to the stop codon, the end of the CDS as given in the GFF, through every exon downstream of the
+    variant, including the exons of the 3' UTR after the stop codon, the sum of the GERP scores and the
+    distance, which loses a base for each exon; then the distance less the coding length of the exon
+    with the stop codon must be at most 50 bp, and the GERP score at most -58.
+*/
+static int loftee_end_trunc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, int iexon)
+{
+    if ( !args.chr_gerp )
+        error("The sequence \"%s\" is not in the GERP file %s\n", bcf_hdr_id2name(args.hdr_in, args.rid), args.gerp->fname);
+
+    int fwd = tr->strand==STRAND_FWD, i;
+    int64_t pos  = (int64_t)var->pos + 1;
+    int64_t stop = fwd ? (int64_t)tx->gff_end + 1 : (int64_t)tx->gff_beg + 1;
+    double gerp_dist = 0;
+    int64_t dist = 0;
+    for (i=0; i<tx->nexon; i++)
+    {
+        int64_t beg = (int64_t)tx->exon[i].beg + 1, end = (int64_t)tx->exon[i].end + 1, a, b;
+        if ( fwd ? pos > end : pos < beg ) continue;
+        int last = fwd ? beg < stop && end >= stop : end > stop && beg <= stop;
+        int in_exon = pos >= beg && pos <= end;
+        if ( last ) a = in_exon ? pos : (fwd ? beg : end), b = stop;
+        else if ( in_exon ) a = pos, b = fwd ? end : beg;
+        else a = beg, b = end;
+        gerp_dist = gerp_dist + gerp_interval(a, b);
+        dist += a > b ? a - b : b - a;
+    }
+
+    int64_t last_len = -1000;
+    for (i=tx->nexon-1; i>=iexon; i--)
+    {
+        int64_t beg = (int64_t)tx->exon[i].beg + 1, end = (int64_t)tx->exon[i].end + 1;
+        if ( fwd ? beg > stop : end < stop ) continue;
+        if ( fwd ? end >= stop : beg <= stop ) { last_len = fwd ? stop - beg : end - stop; break; }
+    }
+    int64_t from_last = dist - last_len;
+
+    add_info_score("gerp_dist", gerp_dist);
+    add_info_int("bp_dist", dist);
+    add_info_int("dist_from_last_exon", from_last);
+    add_info("50_bp_rule", from_last <= MIN_DIST_LAST_EXON ? "fail" : "pass");
+    return from_last <= MIN_DIST_LAST_EXON && gerp_dist <= GERP_END_TRUNC;
+}
+
+/*
     Truncations by the LOFTEE-2 distances from the start of the CDS and from the start of the last
     exon. A variant starting in an intron is measured from the first base of the next exon.
 
@@ -684,30 +913,36 @@ static int locate_ptc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_t *b
     to the frameshift itself and stop_end_trunc to the stop. There is no NMD to escape in single-exon
     transcripts, hence no stop_end_trunc there.
 */
-static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc, int frameshift)
+static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc, int iexon, int frameshift)
 {
     int from_start = ptc->stop - tx->cds_tbeg - (ptc->istop - tx->cds_ibeg);
+    int end_trunc, stop_end_trunc = 0;
 
-    if ( tx->nexon==1 )
+    if ( args.gerp ) end_trunc = loftee_end_trunc(tr, tx, var, iexon);
+    else if ( tx->nexon==1 )
     {
         uint32_t tend = tr->strand==STRAND_FWD ? tr->end : tr->beg;
         uint32_t to_end = var->pos > tend ? var->pos - tend : tend - var->pos;
         add_info_int("dist_tscript_end", to_end);
-        add_info_int("dist_cds_start", from_start);
-        if ( to_end <= MIN_DIST_TSCRIPT_END ) add_tag("end_trunc", FILTER);
-        if ( from_start <= MIN_DIST_CDS_START_1EX ) add_tag("start_trunc", FILTER);
-        return;
+        end_trunc = to_end <= MIN_DIST_TSCRIPT_END;
     }
-
-    int var_to_last  = dist_last_exon(tx, ptc->var, ptc->ivar);
-    int stop_to_last = dist_last_exon(tx, ptc->stop, ptc->istop);
-    add_info_int("dist_last_exon", var_to_last);
-    if ( frameshift ) add_info_int("stop_dist_last_exon", stop_to_last);
+    else
+    {
+        int var_to_last = dist_last_exon(tx, ptc->var, ptc->ivar);
+        add_info_int("dist_last_exon", var_to_last);
+        end_trunc = var_to_last <= MIN_DIST_LAST_EXON;
+    }
+    if ( frameshift && tx->nexon > 1 )
+    {
+        int stop_to_last = dist_last_exon(tx, ptc->stop, ptc->istop);
+        add_info_int("stop_dist_last_exon", stop_to_last);
+        stop_end_trunc = !end_trunc && stop_to_last <= MIN_DIST_LAST_EXON;
+    }
     add_info_int("dist_cds_start", from_start);
 
-    if ( var_to_last <= MIN_DIST_LAST_EXON ) add_tag("end_trunc", FILTER);
-    else if ( stop_to_last <= MIN_DIST_LAST_EXON ) add_tag("stop_end_trunc", FILTER);
-    if ( from_start <= MIN_DIST_CDS_START ) add_tag("start_trunc", FILTER);
+    if ( end_trunc ) add_tag("end_trunc", FILTER);
+    if ( stop_end_trunc ) add_tag("stop_end_trunc", FILTER);
+    if ( from_start <= (tx->nexon==1 ? MIN_DIST_CDS_START_1EX : MIN_DIST_CDS_START) ) add_tag("start_trunc", FILTER);
 }
 
 /*
@@ -809,7 +1044,7 @@ static const char *assess(gf_tscript_t *tr, tscript_t *tx, variant_t *var, bcsq_
         {
             if ( locate_ptc(tr, tx, var, bcsq, &ptc)==0 )
             {
-                check_truncation(tr, tx, var, &ptc, csq & LOF_FRAMESHIFT);
+                check_truncation(tr, tx, var, &ptc, iexon, csq & LOF_FRAMESHIFT);
                 args.csq_region = nmd_region(tx, &ptc);
             }
             if ( tx->nexon==1 ) add_tag("single_exon", FLAG);
@@ -888,7 +1123,7 @@ static int has_lof_csq(const char *bcsq)
 
 int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
 {
-    char *ref_fname = NULL, *gff_fname = NULL, *anc_fname = NULL, *phylo_fname = NULL;
+    char *ref_fname = NULL, *gff_fname = NULL, *anc_fname = NULL, *phylo_fname = NULL, *gerp_fname = NULL;
     int c, force = 0;
 
     memset(&args, 0, sizeof(args));
@@ -906,6 +1141,7 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
         {"gff-annot",required_argument,NULL,'g'},
         {"info",no_argument,NULL,2},
         {"phylocsf",required_argument,NULL,'p'},
+        {"gerp",required_argument,NULL,3},
         {NULL,0,NULL,0}
     };
     while ((c = getopt_long(argc, argv, "a:c:f:g:p:h?", loptions, NULL)) >= 0)
@@ -919,6 +1155,7 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
             case 'p': phylo_fname = optarg; break;
             case  1 : force = 1; break;
             case  2 : args.write_info = 1; break;
+            case  3 : gerp_fname = optarg; break;
             case 'h':
             case '?':
             default: error("%s", usage()); break;
@@ -940,6 +1177,7 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
     if ( !(args.ref = fai_load(ref_fname)) ) error("Failed to load the fasta index of %s\n", ref_fname);
     if ( !(args.anc = fai_load(anc_fname)) ) error("Failed to load the fasta index of %s\n", anc_fname);
     phylocsf_init(phylo_fname);
+    if ( gerp_fname ) gerp_init(gerp_fname);
 
     args.gff = gff_init(gff_fname);
     gff_set(args.gff, force_out_of_phase, force);
@@ -958,13 +1196,21 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
     bcf_hdr_printf(out, "##INFO=<ID=LOF_REGION,Number=.,Type=String,Description=\"NMD region of the premature stop codon of each %s "
         "consequence (Blakes et al. 2026): start_proximal, distal, long_exon or nmd_target; non_coding for a splice site "
         "of a UTR intron, other for a splice site of a coding intron\">", args.csq_tag);
-    if ( args.write_info )
+    if ( args.write_info && !args.gerp )
         bcf_hdr_printf(out, "##INFO=<ID=LOF_INFO,Number=.,Type=String,Description=\"Values behind the LOFTEE filters and flags of "
             "each %s consequence, key:value pairs separated by '&', '.' if none: dist_last_exon and stop_dist_last_exon, the "
             "LOFTEE-2 distances of the variant and of the new stop codon of a frameshift from the start of the last exon; "
             "dist_cds_start, of the premature stop codon from the start of the CDS; dist_tscript_end, of the variant from the "
             "end of a single-exon transcript; ann_orf and max_orf, the PhyloCSF scores of the exon, or phylocsf_too_short "
             "if it has none; intron_size\">", args.csq_tag);
+    else if ( args.write_info )
+        bcf_hdr_printf(out, "##INFO=<ID=LOF_INFO,Number=.,Type=String,Description=\"Values behind the LOFTEE filters and flags of "
+            "each %s consequence, key:value pairs separated by '&', '.' if none: gerp_dist, bp_dist, dist_from_last_exon and "
+            "50_bp_rule, LOFTEE's GERP-weighted and plain distances from the variant to the stop codon, the latter less the coding "
+            "length of the exon with the stop codon, and its 50 bp rule; stop_dist_last_exon, the LOFTEE-2 distance of the new "
+            "stop codon of a frameshift from the start of the last exon; dist_cds_start, of the premature stop codon from the "
+            "start of the CDS; ann_orf and max_orf, the PhyloCSF scores of the exon, or phylocsf_too_short if it has none; "
+            "intron_size\">", args.csq_tag);
     return 0;
 }
 
@@ -1035,6 +1281,8 @@ void destroy(void)
     free(args.chr_gff_str.s);
     free(args.chr_ref_str.s);
     free(args.chr_anc_str.s);
+    free(args.chr_gerp_str.s);
+    gerp_destroy();
     free(args.lof.s);
     free(args.filters.s);
     free(args.flags.s);

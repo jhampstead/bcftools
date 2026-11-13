@@ -74,6 +74,7 @@ MISC_SCRIPTS = \
     misc/gff2gff \
     misc/gff2gff.py \
     misc/guess-ploidy.py \
+    misc/lof-gerp.py \
     misc/plot-vcfstats \
     misc/plot-roh.py \
     misc/roh-viz \

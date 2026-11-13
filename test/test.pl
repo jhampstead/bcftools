@@ -848,6 +848,14 @@ run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.out',cmd=>'+lof',ar
 run_test(\&test_vcf_plugin,$opts,in=>'lof',out=>'lof.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.gencode',out=>'lof.gencode.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.info.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info');
+if ( `python3 -c 'print(1)' 2>/dev/null` =~ /^1/ )
+{
+    run_test(\&test_cmd,$opts,out=>'lof.gerp.tsv',cmd=>"python3 $$opts{bin}/misc/lof-gerp.py -g $$opts{path}/lof.gff $$opts{path}/lof.gerp.bw");
+}
+bgzip_tabix($opts,file=>'lof.gerp',suffix=>'tsv',args=>'-p bed');
+run_test(\&test_vcf_plugin,$opts,in=>'lof',out=>'lof.gerp.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info --gerp {TMP}/lof.gerp.tsv.gz');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.gencode',out=>'lof.gencode.gerp.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gencode.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info --gerp {TMP}/lof.gerp.tsv.gz');
+run_test(\&test_vcf_plugin,$opts,in=>'lof.hap',out=>'lof.hap.gerp.out',cmd=>'+lof',args=>'-- -f {PATH}/lof.fa -g {PATH}/lof.gff -a {PATH}/lof.anc.fa -p {PATH}/lof.phylocsf.tsv --info --gerp {TMP}/lof.gerp.tsv.gz');
 run_test(\&test_vcf_plugin,$opts,in=>'lof.biotype',out=>'lof.biotype.out',cmd=>'+lof',args=>'-- -f {PATH}/csq/EDUMMY0004/EDUMMY0004.fa -g {PATH}/csq/EDUMMY0004/EDUMMY0004.gff -a {PATH}/lof.biotype.anc.fa -p {PATH}/lof.biotype.phylocsf.tsv');
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.12',out=>'split-vep.12.1.out',cmd=>'+split-vep',args=>qq[-s all:any:worst -f '%CHROM\\t%POS\\t%Annotation\\n' | grep -v ^#]);
 run_test(\&test_vcf_plugin,$opts,in=>'split-vep.11',out=>'split-vep.11.1.out',cmd=>'+split-vep',args=>qq[--csq-field Annotation -a XXX -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%XXX\\n' -d -A tab | grep -v ^#]);
