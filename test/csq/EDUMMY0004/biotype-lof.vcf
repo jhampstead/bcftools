@@ -1,0 +1,8 @@
+##fileformat=VCFv4.2
+##contig=<ID=1,length=600>
+##INFO=<ID=EXP,Number=1,Type=String,Description="Expected consequence">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	178	.	G	A	.	.	EXP=missense|GENE1|T1|protein_coding|+|20A>20T|178G>A,missense|GENE1|T2|protein_coding_LoF|+|20A>20T|178G>A
+1	251	.	G	A	.	.	EXP=splice_donor|GENE1|T1|protein_coding,splice_donor|GENE1|T2|protein_coding_LoF
+1	350	.	G	C	.	.	EXP=splice_acceptor|GENE1|T1|protein_coding,splice_acceptor|GENE1|T2|protein_coding_LoF
+1	399	.	G	A	.	.	EXP=stop_gained|GENE1|T1|protein_coding|+|60W>60*|399G>A,stop_gained|GENE1|T2|protein_coding_LoF|+|60W>60*|399G>A

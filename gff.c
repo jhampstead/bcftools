@@ -143,7 +143,7 @@ static const char *gf_strings_noncoding[] =
     "LRG_gene", "3_prime_overlapping_ncRNA", "disrupted_domain", "vaultRNA", "bidirectional_promoter_lncRNA", "ambiguous_orf",
     "lncRNA"
 };
-static const char *gf_strings_coding[] = { "protein_coding", "polymorphic_pseudogene", "IG_C", "IG_D", "IG_J", "IG_LV", "IG_V", "TR_C", "TR_D", "TR_J", "TR_V", "NMD", "non_stop_decay"};
+static const char *gf_strings_coding[] = { "protein_coding", "polymorphic_pseudogene", "IG_C", "IG_D", "IG_J", "IG_LV", "IG_V", "TR_C", "TR_D", "TR_J", "TR_V", "NMD", "non_stop_decay", "protein_coding_LoF"};
 static const char *gf_strings_special[] = { "CDS", "exon", "3_prime_UTR", "5_prime_UTR" };
 
 int gff_set(gff_t *gff, gff_opt_t key, ...)
@@ -296,7 +296,10 @@ static inline int gff_parse_biotype(char *line)
     switch (*line)
     {
         case 'p':
-            if ( !strncmp(line,"protein_coding",14) ) return GF_PROTEIN_CODING;
+            // protein_coding_LoF: not translated in the reference owing to a SNP or indel, but translated in
+            // other haplotypes. It replaces polymorphic_pseudogene, and must be matched before protein_coding
+            if ( !strncmp(line,"protein_coding_LoF",18) ) return GF_PROTEIN_CODING_LOF;
+            else if ( !strncmp(line,"protein_coding",14) ) return GF_PROTEIN_CODING;
             else if ( !strncmp(line,"pseudogene",10) ) return GF_PSEUDOGENE;
             else if ( !strncmp(line,"processed_transcript",20) ) return GF_PROCESSED_TRANSCRIPT;
             else if ( !strncmp(line,"processed_pseudogene",20) ) return GF_PROCESSED_PSEUDOGENE;

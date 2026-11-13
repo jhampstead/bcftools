@@ -56,6 +56,7 @@
         polymorphic_pseudogene
         processed_transcript
         protein_coding, mRNA
+        protein_coding_LoF
         ribozyme
         rRNA
         sRNA
@@ -81,8 +82,8 @@
             C .. corresponding CDS, exon, and UTR lines:
                     C[3] in {"CDS","exon","three_prime_UTR","five_prime_UTR"} && C.Parent=~/^transcript:B.ID/
 
-        For coding biotypes ("protein_coding" or "polymorphic_pseudogene") the
-        complete chain link C -> B -> A is required. For the rest, link B -> A suffices.
+        For coding biotypes ("protein_coding", "protein_coding_LoF" or "polymorphic_pseudogene")
+        the complete chain link C -> B -> A is required. For the rest, link B -> A suffices.
 
 
     The supported consequence types, sorted by impact:
@@ -229,6 +230,7 @@
 #define GF_TR_V                        (11|(1<<GF_coding_bit))
 #define GF_NMD                         (12|(1<<GF_coding_bit))
 #define GF_NON_STOP_DECAY              (13|(1<<GF_coding_bit))
+#define GF_PROTEIN_CODING_LOF          (14|(1<<GF_coding_bit))
 #define GF_CDS      ((1<<(GF_coding_bit+1))+1)                  // special types: 129, 130, ...
 #define GF_EXON     ((1<<(GF_coding_bit+1))+2)
 #define GF_UTR3     ((1<<(GF_coding_bit+1))+3)

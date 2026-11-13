@@ -1,0 +1,12 @@
+178	G	A	missense|GENE1|T1|protein_coding|+|20A>20T|178G>A,missense|GENE1|T2|protein_coding_LoF|+|20A>20T|178G>A
+178	G	A	missense|GENE1|T1|protein_coding|+|20A>20T|178G>A,missense|GENE1|T2|protein_coding_LoF|+|20A>20T|178G>A
+
+251	G	A	splice_donor|GENE1|T1|protein_coding,splice_donor|GENE1|T2|protein_coding_LoF
+251	G	A	splice_donor|GENE1|T1|protein_coding,splice_donor|GENE1|T2|protein_coding_LoF
+
+350	G	C	splice_acceptor|GENE1|T1|protein_coding,splice_acceptor|GENE1|T2|protein_coding_LoF
+350	G	C	splice_acceptor|GENE1|T1|protein_coding,splice_acceptor|GENE1|T2|protein_coding_LoF
+
+399	G	A	stop_gained|GENE1|T1|protein_coding|+|60W>60*|399G>A,stop_gained|GENE1|T2|protein_coding_LoF|+|60W>60*|399G>A
+399	G	A	stop_gained|GENE1|T1|protein_coding|+|60W>60*|399G>A,stop_gained|GENE1|T2|protein_coding_LoF|+|60W>60*|399G>A
+

@@ -54,6 +54,7 @@
         polymorphic_pseudogene
         processed_transcript
         protein_coding, mRNA
+        protein_coding_LoF
         ribozyme
         rRNA
         sRNA
@@ -79,8 +80,8 @@
             C .. corresponding CDS, exon, and UTR lines:
                     C[3] in {"CDS","exon","three_prime_UTR","five_prime_UTR"} && C.Parent=~/^transcript:B.ID/
 
-        For coding biotypes ("protein_coding" or "polymorphic_pseudogene") the
-        complete chain link C -> B -> A is required. For the rest, link B -> A suffices.
+        For coding biotypes ("protein_coding", "protein_coding_LoF" or "polymorphic_pseudogene")
+        the complete chain link C -> B -> A is required. For the rest, link B -> A suffices.
 
 
     The supported consequence types, sorted by impact:

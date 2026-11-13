@@ -1,0 +1,15 @@
+1	test	gene	101	500	.	+	.	ID=gene:G1;Name=GENE1;biotype=protein_coding
+1	test	transcript	101	500	.	+	.	ID=transcript:T1;Parent=gene:G1;biotype=protein_coding
+1	test	five_prime_UTR	101	120	.	+	.	Parent=transcript:T1
+1	test	exon	101	250	.	+	.	Parent=transcript:T1
+1	test	CDS	121	250	.	+	0	ID=CDS:P1;Parent=transcript:T1
+1	test	exon	351	500	.	+	.	Parent=transcript:T1
+1	test	CDS	351	481	.	+	2	ID=CDS:P1;Parent=transcript:T1
+1	test	three_prime_UTR	482	500	.	+	.	Parent=transcript:T1
+1	test	transcript	101	500	.	+	.	ID=transcript:T2;Parent=gene:G1;biotype=protein_coding_LoF
+1	test	five_prime_UTR	101	120	.	+	.	Parent=transcript:T2
+1	test	exon	101	250	.	+	.	Parent=transcript:T2
+1	test	CDS	121	250	.	+	0	ID=CDS:P2;Parent=transcript:T2
+1	test	exon	351	500	.	+	.	Parent=transcript:T2
+1	test	CDS	351	481	.	+	2	ID=CDS:P2;Parent=transcript:T2
+1	test	three_prime_UTR	482	500	.	+	.	Parent=transcript:T2

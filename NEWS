@@ -39,6 +39,11 @@ Changes affecting specific commands:
       from transcript_type, gene_type and gene_name when the Ensembl attributes
       are absent, and start_codon and stop_codon lines are skipped
 
+    - The coding biotype protein_coding_LoF of GENCODE and Ensembl, transcripts
+      not translated in the reference owing to a SNP or indel, is recognised
+      and reported as such rather than as protein_coding. Its consequences are
+      unchanged
+
 * bcftools consensus
 
     - Fix -M masking of symbolic deletions and mixed multiallelic sites,
