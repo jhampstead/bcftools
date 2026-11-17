@@ -21,7 +21,8 @@
           too close to the start of the CDS, as LOFTEE-2 does
         - for a frameshift, start_trunc is measured from the new stop codon,
           located from the protein predicted by csq, and stop_end_trunc filters
-          a frameshift whose new stop falls where end_trunc would apply
+          a frameshift outside the region of the LOFTEE-2 end_trunc whose new
+          stop codon falls inside it
         - the 50 bp rule of end_trunc is measured to the last exon of the
           transcript, which can follow the last coding exon: an exon junction
           in the 3' UTR makes a stop upstream of it a target of NMD
@@ -42,7 +43,9 @@
     averages the scores from, so that the distances are computed as in LOFTEE,
     including that its distance runs through the exons of the 3' UTR and that
     the stop codon is the end of the CDS given in the GFF. start_trunc and
-    stop_end_trunc stay those of LOFTEE-2.
+    stop_end_trunc do not change: stop_end_trunc still filters only a frameshift
+    outside the region of the LOFTEE-2 end_trunc, so that a frameshift inside it
+    is left to the end_trunc of LOFTEE.
 
     With --info, INFO/LOF_INFO gives the values behind the filters and flags, as
     LoF_info does in LOFTEE: the distances of the truncation filters, the PhyloCSF
@@ -224,11 +227,12 @@ const char *usage(void)
         "       --gerp FILE             end_trunc as in LOFTEE instead of LOFTEE-2: by LOFTEE's distance from the stop\n"
         "                               codon less the coding length of its exon, at most 50 bp, and a GERP-weighted\n"
         "                               distance of at most -58, from GERP scores made by lof-gerp.py (see below).\n"
-        "                               start_trunc and stop_end_trunc stay those of LOFTEE-2\n"
+        "                               start_trunc and stop_end_trunc do not change\n"
         "   -g, --gff-annot FILE        The GFF3 annotation given to bcftools csq, Ensembl or GENCODE\n"
         "       --info                  Add INFO/LOF_INFO, key:value pairs per consequence separated by '&':\n"
         "                                 dist_last_exon       the LOFTEE-2 distance of the variant from the\n"
-        "                                                      start of the last exon (end_trunc)\n"
+        "                                                      start of the last exon (end_trunc,\n"
+        "                                                      stop_end_trunc)\n"
         "                                 stop_dist_last_exon  the same for the new stop codon of a frameshift\n"
         "                                                      (stop_end_trunc)\n"
         "                                 dist_cds_start       the LOFTEE-2 distance of the premature stop codon\n"
@@ -238,8 +242,8 @@ const char *usage(void)
         "                                 ann_orf, max_orf     the PhyloCSF scores of the exon, or\n"
         "                                 phylocsf_too_short   if it has none, as in LOFTEE (phylocsf_*)\n"
         "                                 intron_size          the size of the intron (small_intron)\n"
-        "                               With --gerp, dist_last_exon and dist_tscript_end are replaced by those of\n"
-        "                               LOFTEE's end_trunc, gerp_dist, bp_dist, dist_from_last_exon and 50_bp_rule\n"
+        "                               With --gerp, end_trunc has LOFTEE's gerp_dist, bp_dist, dist_from_last_exon\n"
+        "                               and 50_bp_rule instead, and dist_last_exon is given for frameshifts only\n"
         "   -p, --phylocsf FILE         PhyloCSF scores of the exons, tab-delimited with a header naming the\n"
         "                               columns transcript, exon, corresponding_orf_score and max_score\n"
         "\n"
@@ -717,8 +721,10 @@ static int cmp_indel(const void *a, const void *b)
     The translation goes no further than the end of the CDS, so a protein without the stop means the
     frame reads through into the 3' UTR. The stop is located in the CDS of the haplotype, then moved
     back by the indels upstream of it; a haplotype-aware compound can list indels past the stop too.
-    A frame that reads through, or stops over the stop codon of the CDS, ends with the CDS: where csq's
-    protein ends depends on whether the GFF's CDS includes the stop codon.
+    A frame that reads through ends with the CDS. csq's protein then ends with the last codon of its
+    CDS, which includes the stop codon or not depending on the GFF, so that the end found here falls
+    anywhere in the last five bases of the CDS with the stop codon, by the length of the indels. A
+    stop codon that starts there ends with the CDS too.
 */
 static int frameshift_stop(gf_tscript_t *tr, tscript_t *tx, bcsq_t *bcsq)
 {
@@ -757,7 +763,7 @@ static int frameshift_stop(gf_tscript_t *tr, tscript_t *tx, bcsq_t *bcsq)
         cds_off -= args.indel[i].dlen;
 
     int toff = tx->cds_tbeg + cds_off;
-    return toff >= tx->cds_tend - 3 ? tx->cds_tend : toff;
+    return toff >= tx->cds_tend - 4 ? tx->cds_tend : toff;
 }
 
 // The variant and its premature stop codon, -1 if the variant is past the last exon. The stop of a
@@ -910,13 +916,16 @@ static int loftee_end_trunc(gf_tscript_t *tr, tscript_t *tx, variant_t *var, int
 
     What matters for a frameshift is the stop codon it creates: whether it triggers NMD, and whether
     it is close enough to the start for translation to reinitiate downstream. end_trunc still refers
-    to the frameshift itself and stop_end_trunc to the stop. There is no NMD to escape in single-exon
-    transcripts, hence no stop_end_trunc there.
+    to the frameshift itself and stop_end_trunc to the stop: it filters a frameshift outside the
+    region of the LOFTEE-2 end_trunc whose stop falls inside it, the same with --gerp, so that a
+    frameshift inside the region is left to the end_trunc of LOFTEE. There is no NMD to escape in
+    single-exon transcripts, hence no stop_end_trunc there.
 */
 static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, ptc_t *ptc, int iexon, int frameshift)
 {
     int from_start = ptc->stop - tx->cds_tbeg - (ptc->istop - tx->cds_ibeg);
     int end_trunc, stop_end_trunc = 0;
+    int var_to_last = tx->nexon > 1 ? dist_last_exon(tx, ptc->var, ptc->ivar) : 0;
 
     if ( args.gerp ) end_trunc = loftee_end_trunc(tr, tx, var, iexon);
     else if ( tx->nexon==1 )
@@ -928,15 +937,15 @@ static void check_truncation(gf_tscript_t *tr, tscript_t *tx, variant_t *var, pt
     }
     else
     {
-        int var_to_last = dist_last_exon(tx, ptc->var, ptc->ivar);
         add_info_int("dist_last_exon", var_to_last);
         end_trunc = var_to_last <= MIN_DIST_LAST_EXON;
     }
     if ( frameshift && tx->nexon > 1 )
     {
         int stop_to_last = dist_last_exon(tx, ptc->stop, ptc->istop);
+        if ( args.gerp ) add_info_int("dist_last_exon", var_to_last);
         add_info_int("stop_dist_last_exon", stop_to_last);
-        stop_end_trunc = !end_trunc && stop_to_last <= MIN_DIST_LAST_EXON;
+        stop_end_trunc = var_to_last > MIN_DIST_LAST_EXON && stop_to_last <= MIN_DIST_LAST_EXON;
     }
     add_info_int("dist_cds_start", from_start);
 
@@ -1207,10 +1216,10 @@ int init(int argc, char **argv, bcf_hdr_t *in, bcf_hdr_t *out)
         bcf_hdr_printf(out, "##INFO=<ID=LOF_INFO,Number=.,Type=String,Description=\"Values behind the LOFTEE filters and flags of "
             "each %s consequence, key:value pairs separated by '&', '.' if none: gerp_dist, bp_dist, dist_from_last_exon and "
             "50_bp_rule, LOFTEE's GERP-weighted and plain distances from the variant to the stop codon, the latter less the coding "
-            "length of the exon with the stop codon, and its 50 bp rule; stop_dist_last_exon, the LOFTEE-2 distance of the new "
-            "stop codon of a frameshift from the start of the last exon; dist_cds_start, of the premature stop codon from the "
-            "start of the CDS; ann_orf and max_orf, the PhyloCSF scores of the exon, or phylocsf_too_short if it has none; "
-            "intron_size\">", args.csq_tag);
+            "length of the exon with the stop codon, and its 50 bp rule; dist_last_exon and stop_dist_last_exon, the LOFTEE-2 "
+            "distances of a frameshift and of its new stop codon from the start of the last exon; dist_cds_start, of the "
+            "premature stop codon from the start of the CDS; ann_orf and max_orf, the PhyloCSF scores of the exon, or "
+            "phylocsf_too_short if it has none; intron_size\">", args.csq_tag);
     return 0;
 }
 

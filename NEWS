@@ -74,9 +74,10 @@ Changes affecting specific commands:
       INFO/LOF_FLAGS for each INFO/BCSQ consequence. The filters and flags are
       in lower case, like the consequences of `csq`. end_trunc follows the
       LOFTEE-2 cutoffs instead of GERP and is measured to the last exon of the
-      transcript, coding or not, stop_end_trunc filters frameshifts whose new
-      stop codon escapes NMD, there are no splice predictions, and the
-      transcripts are read from the Ensembl or GENCODE GFF3 used by `csq`.
+      transcript, coding or not, stop_end_trunc filters frameshifts outside
+      that end region whose new stop codon falls inside it, there are no splice
+      predictions, and the transcripts are read from the Ensembl or GENCODE
+      GFF3 used by `csq`.
       Local and haplotype-aware `csq` output are both supported. INFO/LOF_REGION
       gives the NMD region of the premature stop codon as defined by Blakes et
       al. (2026), and with `--info`, INFO/LOF_INFO gives the values behind the

@@ -43,6 +43,10 @@ chr1	8814	.	C	A	.	.	TEST=F_end_trunc;BCSQ=stop_gained|GENEF|ENST00000000501|prot
 chr1	9836	.	C	CT	.	.	TEST=G_fs_early_late_stop;BCSQ=frameshift|GENEG|ENST00000000601|protein_coding|+|10AAA..201>10ACR..134|9836C>CT
 chr1	9956	.	CG	C	.	.	TEST=G_fs_stop_46;BCSQ=frameshift|GENEG|ENST00000000601|protein_coding|+|50AAA..201>50APP..135|9956CG>C
 chr1	9986	.	C	CT	.	.	TEST=G_fs_stop_51;BCSQ=frameshift|GENEG|ENST00000000601|protein_coding|+|60AAA..201>60ACR..134|9986C>CT
+chr1	10659	.	CG	C	.	.	TEST=G_fs_last_exon_start;BCSQ=frameshift|GENEG|ENST00000000601|protein_coding|+|151AAA..201>151APP..201|10659CG>C
+chr1	10803	.	CG	C	.	.	TEST=G_fs_last_exon_end;BCSQ=frameshift|GENEG|ENST00000000601|protein_coding|+|199AA*>199AP|10803CG>C
+chr1	11594	.	GC	G	.	.	TEST=H_fs_last_exon_end;BCSQ=frameshift|GENEH|ENST00000000701|protein_coding|-|200A*>200P|11594GC>G
+chr1	11738	.	GC	G	.	.	TEST=H_fs_last_exon_start;BCSQ=frameshift|GENEH|ENST00000000701|protein_coding|-|152AAA..201>152PPP..201|11738GC>G
 chr1	12412	.	C	CA	.	.	TEST=H_fs_readthrough;BCSQ=frameshift|GENEH|ENST00000000701|protein_coding|-|61AAA..201>61CRR..202|12412C>CA
 chr1	12441	.	GC	G	.	.	TEST=H_fs_stop_49;BCSQ=frameshift|GENEH|ENST00000000701|protein_coding|-|51AAA..201>51PPP..134|12441GC>G
 chr1	12571	.	CG	C	.	.	TEST=H_fs_early_stop;BCSQ=frameshift|GENEH|ENST00000000701|protein_coding|-|7AAA..201>7APP..13|12571CG>C
